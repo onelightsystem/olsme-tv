@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "user-avatar",
+      "description": "A placeholder avatar for a user.",
+      "imageUrl": "https://picsum.photos/seed/user-avatar/200/200",
+      "imageHint": "person portrait"
+    }
+  ]
 }
