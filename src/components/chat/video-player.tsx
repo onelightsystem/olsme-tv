@@ -22,7 +22,7 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false }: Vid
       
       <div className="absolute top-2 left-2 flex items-center gap-2">
         <Badge variant={isLocal ? "default" : "secondary"}>
-          {isLocal ? 'You' : 'Stranger'}
+          {isLocal ? 'You' : 'olsme user'}
         </Badge>
         {isMuted && <MicOff className="w-4 h-4 text-destructive" />}
       </div>

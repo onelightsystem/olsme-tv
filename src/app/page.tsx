@@ -101,10 +101,10 @@ export default function Home() {
             <CardContent className="p-8">
               <Sun className="mx-auto h-16 w-16 text-primary mb-4" />
               <h1 className="text-3xl font-bold font-headline mb-2 text-foreground">
-                Welcome to Awake Chat
+                Welcome to olsme.tv
               </h1>
               <p className="text-muted-foreground mb-6">
-                Connect with another soul. Practice mindful communication.
+                 Connect and practice Mindful Video Chat.
               </p>
               <Button size="lg" onClick={handleStartChat} className="w-full">
                 Start a Mindful Chat

@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { getPolitenessPrompt } from "@/ai/actions";
 
 type Message = {
-  sender: "You" | "Stranger";
+  sender: "You" | "olsme-user";
   text: string;
 };
 
@@ -33,9 +33,9 @@ export default function ChatPanel() {
     setMessages(newMessages);
     setNewMessage("");
 
-    // Simulate stranger's reply for demo
+    // Simulate olsme-user's reply for demo
     setTimeout(() => {
-        setMessages(prev => [...prev, {sender: "Stranger", text: "That's an interesting point."}])
+        setMessages(prev => [...prev, {sender: "olsme-user", text: "That's an interesting point."}])
     }, 1500)
 
     const conversationHistory = newMessages.map(m => `${m.sender}: ${m.text}`).join('\n');
