@@ -1,4 +1,5 @@
+//src/ai/dev.ts
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/generate-politeness-prompt.ts';
+import '@/ai/flows/generate-politeness-prompt';

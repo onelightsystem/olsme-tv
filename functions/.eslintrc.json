@@ -1,0 +1,10 @@
+{
+  "extends": "plugin:@typescript-eslint/recommended",
+  "rules": {
+    "indent": ["error", 2],
+    "object-curly-spacing": ["error", "never"],
+    "eol-last": ["error", "always"],
+    "@typescript-eslint/no-var-requires": "off"
+  },
+  "ignorePatterns": ["lib/"]
+}
