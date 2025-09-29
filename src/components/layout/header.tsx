@@ -7,7 +7,7 @@
 
 'use client';
 import Link from 'next/link';
-import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search } from 'lucide-react';
+import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search, Shield } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import {
   auth,
@@ -21,7 +21,7 @@ import {
 import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';
-import { RecaptchaVerifier, ConfirmationResult, signOut, User as FirebaseUser } from 'firebase/auth';
+import { RecaptchaVerifier, ConfirmationResult, signOut, User as FirebaseUser, IdTokenResult } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
 import {
   Dialog,
@@ -46,6 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
 export default function Header() {
   const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const [claims, setClaims] = useState<IdTokenResult['claims'] | null>(null);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -62,9 +63,19 @@ export default function Header() {
   const [signInPassword, setSignInPassword] = useState('');
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
+    const unsubscribe = auth.onAuthStateChanged(async (u) => {
+        setUser(u);
+        if (u) {
+            const tokenResult = await u.getIdTokenResult();
+            setClaims(tokenResult.claims);
+        } else {
+            setClaims(null);
+        }
+    });
     return () => unsubscribe();
   }, []);
+
+  const isAdmin = claims?.isAdmin === true;
 
   const handleTwitterSignIn = async () => {
     try {
@@ -210,6 +221,14 @@ export default function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Welcome, {user.displayName || 'Friend'}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <Link href="/admin/users" passHref>
+                      <DropdownMenuItem>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
                   <Link href="/profile" passHref>
                     <DropdownMenuItem>
                       <User className="mr-2 h-4 w-4" />

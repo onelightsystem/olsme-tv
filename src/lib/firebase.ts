@@ -51,7 +51,6 @@ const createUserDocument = async (user: { uid: string; displayName?: string | nu
       politenessScore: { ethical: 75, communication: 75, listener: 75, topics: 75 }, // Start with a neutral score
       verificationLevel: 'level1', // Start at level 1
       olsPoints: 0, // Start with 0 points
-      name: '',
       location: '',
       age: null,
     }, { merge: true }) // Use merge to avoid overwriting existing data if user re-authenticates
@@ -157,5 +156,29 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
     throw e;
   }
 }
+
+export async function requestKYCVerification() {
+  if (!auth.currentUser) throw new Error("User not authenticated");
+  try {
+    const functions = getFunctions();
+    const sendAdminEmail = httpsCallable(functions, 'sendAdminEmail');
+    const response: any = await sendAdminEmail({ 
+      userId: auth.currentUser.uid, 
+      displayName: auth.currentUser.displayName,
+      email: auth.currentUser.email
+    });
+
+    if (response.data.success) {
+      await logToIPFS({ userId: auth.currentUser.uid, action: 'request_kyc' });
+    } else {
+      throw new Error(response.data.message || 'Failed to send verification request.');
+    }
+  } catch (error) {
+    await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification'));
+    await logToIPFS({ error: (error as Error).message, context: 'requestKYCVerification' });
+    throw error;
+  }
+}
+
 
 export { createUserDocument };

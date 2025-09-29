@@ -24,6 +24,22 @@ const corsHandler = cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
+const ADMIN_EMAIL = "info@olsme.com";
+
+const setAdminClaim = async (user: admin.auth.UserRecord) => {
+    if (user.email === ADMIN_EMAIL && !user.customClaims?.isAdmin) {
+        functions.logger.info(`Setting admin claim for ${user.uid}`);
+        await admin.auth().setCustomUserClaims(user.uid, { ...user.customClaims, isAdmin: true });
+        return true;
+    }
+    return false;
+};
+
+export const onUserCreate = functions.auth.user().onCreate(async (user) => {
+    await setAdminClaim(user);
+});
+
+
 export const upgradeToPremium = functions.https.onCall(async (data, context) => {
     // Ensure the user is authenticated.
     if (!context.auth) {
@@ -87,10 +103,12 @@ export const setPolitenessClaim = functions.https.onCall(async (data, context) =
     }
 
     const verificationLevel = userData.verificationLevel || 'level1';
+    
+    const existingClaims = (await admin.auth().getUser(uid)).customClaims || {};
 
     try {
         await admin.auth().setCustomUserClaims(uid, { 
-            ...context.auth.token, // Preserve existing claims
+            ...existingClaims,
             politenessLevel: politenessLevel,
             verificationLevel: verificationLevel
         });
@@ -149,8 +167,6 @@ export const searchUsers = functions.https.onCall(async (data, context) => {
 
     let userQuery: admin.firestore.Query = db.collection('users');
 
-    // For case-insensitive search, we query against a stored lowercase field.
-    // This requires a composite index on (displayName_lowercase, verificationLevel).
     if (normalizedQuery) {
         userQuery = userQuery
             .where('displayName_lowercase', '>=', normalizedQuery)
@@ -168,7 +184,6 @@ export const searchUsers = functions.https.onCall(async (data, context) => {
             return { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel };
         });
 
-        // Log the search action
         await db.collection('logs').add({
             userId: context.auth.uid,
             action: 'searchUsers',
@@ -184,5 +199,94 @@ export const searchUsers = functions.https.onCall(async (data, context) => {
             'internal',
             'An error occurred while searching for users.'
         );
+    }
+});
+
+export const updateUserStatus = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const { status } = data;
+    const uid = context.auth.uid;
+    if (!['online', 'offline'].includes(status)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Status must be "online" or "offline".');
+    }
+
+    const userStatusRef = db.collection('user_status').doc(uid);
+    try {
+        await userStatusRef.set({
+            status,
+            last_changed: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { success: true };
+    } catch (error) {
+        functions.logger.error(`Failed to update status for user ${uid}`, error);
+        throw new functions.https.HttpsError('internal', 'Could not update user status.');
+    }
+});
+
+export const sendAdminEmail = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    
+    const { userId, displayName, email } = data;
+    
+    // In a real app, you would integrate with an email service like SendGrid or Mailgun.
+    // For this prototype, we'll log to Firestore to simulate the email.
+    const logMessage = {
+        to: ADMIN_EMAIL,
+        from: 'system@olsme.tv',
+        subject: `KYC Verification Request from ${displayName}`,
+        body: `User ${displayName} (UID: ${userId}, Email: ${email}) has requested Level 3 KYC verification.`,
+        timestamp: new Date(),
+    };
+
+    try {
+        await db.collection('mail').add(logMessage);
+        functions.logger.info(`Simulated email for KYC request for user ${userId}.`);
+        
+        await db.collection('logs').add({
+            userId: context.auth.uid,
+            action: 'sendAdminEmail',
+            details: `KYC request for ${userId}`,
+            timestamp: new Date(),
+        });
+
+        return { success: true, message: "Verification request sent." };
+    } catch (error) {
+        functions.logger.error(`Failed to send admin email for user ${userId}`, error);
+        throw new functions.https.HttpsError('internal', 'Could not process the verification request.');
+    }
+});
+
+export const getAllUsers = functions.https.onCall(async (data, context) => {
+    if (!context.auth?.token.isAdmin) {
+        throw new functions.https.HttpsError('permission-denied', 'Must be an admin to access user data.');
+    }
+
+    try {
+        const [usersSnapshot, statusSnapshot] = await Promise.all([
+            db.collection('users').get(),
+            db.collection('user_status').where('status', '==', 'online').get()
+        ]);
+        
+        const onlineUsers = new Set(statusSnapshot.docs.map(doc => doc.id));
+        
+        const users = usersSnapshot.docs.map(doc => {
+            const userData = doc.data();
+            // Convert Firestore Timestamps to ISO strings
+            const createdAt = userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null;
+            return {
+                ...userData,
+                createdAt,
+                status: onlineUsers.has(doc.id) ? 'online' : 'offline'
+            };
+        });
+
+        return { users };
+    } catch (error) {
+        functions.logger.error('Error fetching all users:', error);
+        throw new functions.httpshttps.HttpsError('internal', 'Failed to fetch users.');
     }
 });

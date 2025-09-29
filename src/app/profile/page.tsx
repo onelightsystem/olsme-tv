@@ -4,16 +4,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@lib/firebase/config';
+import { auth, db, requestKYCVerification } from '@lib/firebase/config';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@components/ui/card';
 import { Badge } from '@components/ui/badge';
 import { Progress } from '@components/ui/progress';
 import { Sun, ShieldCheck, Gem, Award } from 'lucide-react';
 import { formatPolitenessScore, logToIPFS } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 type UserProfile = {
   uid: string;
@@ -43,6 +44,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRequestingKYC, setIsRequestingKYC] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,6 +81,25 @@ export default function ProfilePage() {
       return () => unsubscribeSnapshot();
     }
   }, [user, toast]);
+
+  const handleRequestKYC = async () => {
+    setIsRequestingKYC(true);
+    try {
+      await requestKYCVerification();
+      toast({
+        title: 'Request Sent',
+        description: 'Your KYC verification request has been sent to the admin.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Request Failed',
+        description: (error as Error).message || 'An unknown error occurred.',
+      });
+    } finally {
+      setIsRequestingKYC(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -189,6 +210,24 @@ export default function ProfilePage() {
             <p><strong>Age:</strong> {profile.age || 'Not set'}</p>
           </div>
         </CardContent>
+         {profile.verificationLevel !== 'level3' && (
+          <CardFooter className="flex-col gap-2 border-t pt-4">
+            <p className="text-sm text-muted-foreground text-center">
+              Become a fully verified member to enjoy all benefits.
+            </p>
+            <Button
+              onClick={handleRequestKYC}
+              disabled={isRequestingKYC || profile.verificationLevel !== 'level2'}
+            >
+              {isRequestingKYC ? 'Requesting...' : 'Request Level 3 (KYC) Verification'}
+            </Button>
+             {profile.verificationLevel === 'level1' && (
+                <p className="text-xs text-destructive text-center">
+                    You must be Level 2 (Video Verified) to request KYC verification.
+                </p>
+            )}
+          </CardFooter>
+        )}
       </Card>
     </div>
   );
