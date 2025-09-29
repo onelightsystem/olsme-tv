@@ -1,21 +1,25 @@
 // Path: src/lib/firebase.ts
-// Improvements (Sept 29, 2025):
-// - Kept X.com OAuth (`signInWithX`), phone OTP (`signInWithPhone`), politeness score updates (done, Day 2/5).
-// - Kept `logBiofeedbackEvent` for biofeedback logging (done, Day 11).
-// - Fixed import: Removed incorrect `logBiofeedbackEvent` import from `@lib/firebase/config` (new, resolves console error).
-// - Used `@lib/firebase/config` for `auth`, `db` (done).
-// - Added retry logic for Firestore writes (new, Day 2).
-// - Kept IPFS logging for biofeedback (done, Day 4).
-// - Used `formatErrorLog` from `@lib/utils` for consistent logging (done, Day 2).
-// - Aligns with blueprint: Auth with verification, politeness tracking for 100K users (Business Plan).
-// - Solo Tip: Test with `npm run dev`, login with X/phone, trigger biofeedback, check Firestore `users`/`biofeedback`/`logs`, IPFS CID.
+// Improvements (Oct 1, 2025):
+// - Added Email/Password authentication (`signUpWithEmail`, `signInWithEmail`).
+// - Enhanced `signInWithX` and `signUpWithEmail` to create a user document in Firestore with a default 'free' package.
+// - Kept phone OTP (`signInWithPhone`), politeness score updates, and biofeedback logging.
+// - Added user document creation on sign-up to include `package: 'free'`.
+// - Aligns with blueprint: Establishes a clear path for Free/Premium user packages.
 
 import { auth, db } from './firebase/config';
-import { signInWithPopup, TwitterAuthProvider, signInWithPhoneNumber, RecaptchaVerifier } from 'firebase/auth';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import {
+  signInWithPopup,
+  TwitterAuthProvider,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
+import { collection, addDoc, updateDoc, doc, setDoc } from 'firebase/firestore';
 import { formatErrorLog, logToIPFS } from '@lib/utils';
 
-// Retry logic for Firestore writes (new, Day 2)
+// Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
   let attempts = 0;
   while (attempts < maxAttempts) {
@@ -30,60 +34,94 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
   throw new Error('Firestore retry limit reached');
 }
 
-// X.com (Twitter) OAuth for User Authentication (blueprint)
+// Helper to create user document in Firestore
+const createUserDocument = async (user: { uid: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null }) => {
+  const userRef = doc(db, 'users', user.uid);
+  await withFirestoreRetry(() =>
+    setDoc(userRef, {
+      uid: user.uid,
+      displayName: user.displayName || 'Anonymous',
+      email: user.email || null,
+      phoneNumber: user.phoneNumber || null,
+      createdAt: new Date(),
+      package: 'free', // Default to free package
+      politenessScore: { ethical: 0, communication: 0, listener: 0, topics: 0 },
+    })
+  );
+  await logToIPFS({ userId: user.uid, action: 'createUserDocument' });
+};
+
+// Sign up with Email and Password
+export async function signUpWithEmail(email: string, password: string, displayName: string) {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    const user = result.user;
+    await updateProfile(user, { displayName });
+    await createUserDocument({ uid: user.uid, displayName, email: user.email });
+    return user;
+  } catch (e) {
+    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail')));
+    await logToIPFS({ error: (e as Error).message, context: 'signUpWithEmail' });
+    throw e;
+  }
+}
+
+// Sign in with Email and Password
+export async function signInWithEmail(email: string, password: string) {
+    try {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        await logToIPFS({ userId: result.user.uid, action: 'signInWithEmail' });
+        return result.user;
+    } catch (e) {
+        await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail')));
+        await logToIPFS({ error: (e as Error).message, context: 'signInWithEmail' });
+        throw e;
+    }
+}
+
+// X.com (Twitter) OAuth for User Authentication
 export async function signInWithX() {
   try {
     const result = await signInWithPopup(auth, new TwitterAuthProvider());
     const user = result.user;
-    await withFirestoreRetry(() =>
-      addDoc(collection(db, 'users'), {
-        uid: user.uid,
-        displayName: user.displayName,
-        createdAt: new Date(),
-        politenessScore: { ethical: 0, communication: 0, listener: 0, topics: 0 },
-      })
-    );
-    await logToIPFS({ userId: user.uid, action: 'signInWithX' });
+    // This will create or overwrite the user document
+    await createUserDocument(user);
     return user;
   } catch (e) {
-    await withFirestoreRetry(() =>
-      addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX'))
-    );
-    await logToIPFS({ error: e.message, context: 'signInWithX' });
+    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX')));
+    await logToIPFS({ error: (e as Error).message, context: 'signInWithX' });
     throw e;
   }
 }
 
-// Phone OTP Authentication (blueprint)
+// Phone OTP Authentication
 export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) {
   try {
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+    // User document is created after confirmation in the UI component
+    await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
     return confirmationResult;
   } catch (e) {
-    await withFirestoreRetry(() =>
-      addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone'))
-    );
-    await logToIPFS({ error: e.message, context: 'signInWithPhone' });
+    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone')));
+    await logToIPFS({ error: (e as Error).message, context: 'signInWithPhone' });
     throw e;
   }
 }
 
-// Update Politeness Score in Firestore (Day 5)
+// Update Politeness Score in Firestore
 export async function updatePolitenessScore(userId: string, score: { ethical: number; communication: number; listener: number; topics: number }) {
   try {
     const userRef = doc(db, 'users', userId);
     await withFirestoreRetry(() => updateDoc(userRef, { politenessScore: score }));
     await logToIPFS({ userId, score, action: 'updatePolitenessScore' });
   } catch (e) {
-    await withFirestoreRetry(() =>
-      addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore'))
-    );
-    await logToIPFS({ error: e.message, context: 'updatePolitenessScore' });
+    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore')));
+    await logToIPFS({ error: (e as Error).message, context: 'updatePolitenessScore' });
     throw e;
   }
 }
 
-// Log biofeedback event to Firestore (Day 11)
+// Log biofeedback event to Firestore
 export async function logBiofeedbackEvent(userId: string, event: { type: string; value: number; cid?: string }) {
   try {
     const logData = {
@@ -96,10 +134,10 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
     await withFirestoreRetry(() => addDoc(collection(db, 'biofeedback'), logData));
     await logToIPFS(logData);
   } catch (e) {
-    await withFirestoreRetry(() =>
-      addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent'))
-    );
-    await logToIPFS({ error: e.message, context: 'logBiofeedbackEvent' });
+    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent')));
+    await logToIPFS({ error: (e as Error).message, context: 'logBiofeedbackEvent' });
     throw e;
   }
 }
+
+export { createUserDocument };

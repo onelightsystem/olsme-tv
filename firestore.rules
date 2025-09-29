@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can read their own data and other users' public profiles.
+    // They can only create/update their own document.
+    match /users/{userId} {
+      allow read;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Prompts can be read and written by any authenticated user.
+    match /prompts/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Reports can be created by any authenticated user.
+    match /reports/{document=**} {
+      allow create: if request.auth != null;
+      allow read: if false; // No one can read reports directly.
+    }
+
+    // Control logs can be written by any authenticated user.
+    match /control_logs/{document=**} {
+      allow write: if request.auth != null;
+    }
+
+    // Users can write to their own politeness scores.
+    match /politeness_scores/{userId}/{document=**} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Biofeedback can be written by any authenticated user for themselves.
+    match /biofeedback/{userId}/{document=**} {
+       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Logs can be written by anyone, but only read by authenticated users.
+    match /logs/{document=**} {
+      allow write: if true;
+      allow read: if request.auth != null;
+    }
+
+    // Premium content is restricted to users with the 'isPremium' custom claim.
+    match /premium_content/{document=**} {
+      allow read: if request.auth != null && request.auth.token.isPremium == true;
+      allow write: if request.auth != null && request.auth.token.isPremium == true;
+    }
+  }
+}
