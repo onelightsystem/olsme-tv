@@ -5,14 +5,15 @@
 
 import { useEffect, useState } from 'react';
 import { auth, db } from '@lib/firebase/config';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
 import { Badge } from '@components/ui/badge';
 import { Progress } from '@components/ui/progress';
 import { Sun, ShieldCheck, Gem, Award } from 'lucide-react';
-import { formatPolitenessScore } from '@/lib/utils';
+import { formatPolitenessScore, logToIPFS } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 type UserProfile = {
   uid: string;
@@ -28,6 +29,8 @@ type UserProfile = {
   };
   olsPoints: number;
   createdAt: any;
+  location: string;
+  age: number;
 };
 
 const verificationLevelText = {
@@ -40,10 +43,14 @@ export default function ProfilePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((u) => {
+    const unsubscribeAuth = auth.onAuthStateChanged(async (u) => {
       setUser(u);
+      if (u) {
+        await logToIPFS({ userId: u.uid, action: 'profile_view' });
+      }
       if (!u) {
         setLoading(false);
         setProfile(null);
@@ -60,30 +67,43 @@ export default function ProfilePage() {
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
-          console.log('No such document!');
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not find user profile.' });
           setProfile(null);
         }
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching profile:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to load profile.' });
         setLoading(false);
       });
       return () => unsubscribeSnapshot();
     }
-  }, [user]);
+  }, [user, toast]);
 
   if (loading) {
     return (
       <div className="container mx-auto p-4 max-w-2xl">
         <Card>
           <CardHeader>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-8 w-48 mx-auto" />
+            <Skeleton className="h-4 w-64 mx-auto" />
           </CardHeader>
           <CardContent className="space-y-6">
-            <Skeleton className="h-6 w-1/2" />
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-6 w-1/4" />
-            <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
+             <div className="flex justify-around">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-20" />
+            </div>
+            <div className="space-y-2 pt-4">
+                <Skeleton className="h-6 w-1/2 mx-auto" />
+                <Skeleton className="h-12 w-1/3 mx-auto" />
+                <Skeleton className="h-2 w-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
             </div>
           </CardContent>
         </Card>
@@ -144,7 +164,7 @@ export default function ProfilePage() {
                 <span>{badge}: {message}</span>
             </div>
           </div>
-
+          
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="space-y-1">
                 <p>Ethical: {profile.politenessScore.ethical}</p>
@@ -162,6 +182,11 @@ export default function ProfilePage() {
                 <p>Topics: {profile.politenessScore.topics}</p>
                 <Progress value={profile.politenessScore.topics} className="h-1" />
             </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4 text-sm text-muted-foreground">
+            <p><strong>Location:</strong> {profile.location || 'Not set'}</p>
+            <p><strong>Age:</strong> {profile.age || 'Not set'}</p>
           </div>
         </CardContent>
       </Card>
