@@ -1,9 +1,9 @@
 // Path: src/components/layout/header.tsx
-// Improvements (Oct 2, 2025):
-// - Added Link to new /profile page.
-// - Kept Radix Dialogs for Email and Phone sign-in flows.
-// - Kept separate forms for Sign Up and Sign In.
-// - Maintained Twitter sign-in, biofeedback toggle, and branding.
+// Improvements (Oct 3, 2025):
+// - Replaced multiple login buttons with a single User profile icon.
+// - For guests, the icon opens a sign-in/sign-up dialog.
+// - For logged-in users, the icon opens a dropdown menu with links to Profile and a Sign Out button.
+// - Maintained all existing authentication logic (Email, Phone, Twitter).
 
 'use client';
 import Link from 'next/link';
@@ -31,6 +31,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@components/ui/input';
 import { Label } from '@components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
@@ -186,39 +194,37 @@ export default function Header() {
               <Volume2 className="h-5 w-5 stroke-[#FFD700]" />
             </Button>
             {user ? (
-               <>
-                <Link href="/profile">
-                  <Button variant="ghost" className="hidden sm:flex">
-                    <User className="h-5 w-5 mr-2 stroke-[#FFD700]" />
-                    Profile
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="User Profile">
+                    <User className="h-5 w-5 stroke-[#FFD700]" />
                   </Button>
-                </Link>
-                <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {user.displayName || 'Friend'}</span>
-                <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign Out">
-                  <LogOut className="h-5 w-5 stroke-[#FFD700]" />
-                </Button>
-               </>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Welcome, {user.displayName || 'Friend'}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <Link href="/profile" passHref>
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
-                <>
-                <Button variant="ghost" onClick={() => setAuthDialogOpen(true)}>
-                    <Mail className="h-5 w-5 mr-2 stroke-[#FFD700]" />
-                    Email
-                </Button>
-                <Button variant="ghost" onClick={() => setPhoneDialogOpen(true)}>
-                    <Phone className="h-5 w-5 mr-2 stroke-[#FFD700]" />
-                    Phone
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleTwitterSignIn} aria-label="Login with X">
-                    <Twitter className="h-5 w-5 stroke-[#FFD700]" />
-                    <span className="sr-only">Login with X</span>
-                </Button>
-              </>
+              <Button variant="ghost" size="icon" onClick={() => setAuthDialogOpen(true)} aria-label="Login or Sign Up">
+                <User className="h-5 w-5 stroke-[#FFD700]" />
+              </Button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Email Auth Dialog */}
+      {/* Auth Dialog for Email, Phone, and Twitter */}
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <Tabs defaultValue="signin" className="w-full">
@@ -277,7 +283,10 @@ export default function Header() {
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
             <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
           </div>
-          <Button variant="outline" onClick={handleTwitterSignIn}><Twitter className="mr-2 h-4 w-4" /> Twitter</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={handleTwitterSignIn}><Twitter className="mr-2 h-4 w-4" /> Twitter</Button>
+            <Button variant="outline" onClick={() => { setAuthDialogOpen(false); setPhoneDialogOpen(true); }}><Phone className="mr-2 h-4 w-4" /> Phone</Button>
+          </div>
         </DialogContent>
       </Dialog>
       
