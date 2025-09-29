@@ -67,7 +67,11 @@ export async function signUpWithEmail(email: string, password: string, displayNa
     await createUserDocument({ uid: user.uid, displayName, email: user.email });
     return user;
   } catch (e) {
-    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail')));
+    await withFirestoreRetry(() => {
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail'))
+        }
+    });
     await logToIPFS({ error: (e as Error).message, context: 'signUpWithEmail' });
     throw e;
   }
@@ -80,7 +84,11 @@ export async function signInWithEmail(email: string, password: string) {
         await logToIPFS({ userId: result.user.uid, action: 'signInWithEmail' });
         return result.user;
     } catch (e) {
-        await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail')));
+        await withFirestoreRetry(() => {
+            if (e instanceof Error) {
+                addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail'))
+            }
+        });
         await logToIPFS({ error: (e as Error).message, context: 'signInWithEmail' });
         throw e;
     }
@@ -94,7 +102,11 @@ export async function signInWithX() {
     await createUserDocument(user);
     return user;
   } catch (e) {
-    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX')));
+    await withFirestoreRetry(() => {
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX'))
+        }
+    });
     await logToIPFS({ error: (e as Error).message, context: 'signInWithX' });
     throw e;
   }
@@ -107,7 +119,11 @@ export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: Re
     await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
     return confirmationResult;
   } catch (e) {
-    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone')));
+    await withFirestoreRetry(() => {
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone'))
+        }
+    });
     await logToIPFS({ error: (e as Error).message, context: 'signInWithPhone' });
     throw e;
   }
@@ -132,7 +148,11 @@ export async function updatePolitenessScore(userId: string, score: { ethical: nu
     }
 
   } catch (e) {
-    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore')));
+    await withFirestoreRetry(() => {
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore'))
+        }
+    });
     await logToIPFS({ error: (e as Error).message, context: 'updatePolitenessScore' });
     throw e;
   }
@@ -151,7 +171,11 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
     await withFirestoreRetry(() => addDoc(collection(db, 'biofeedback'), logData));
     await logToIPFS(logData);
   } catch (e) {
-    await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent')));
+    await withFirestoreRetry(() => {
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent'))
+        }
+    });
     await logToIPFS({ error: (e as Error).message, context: 'logBiofeedbackEvent' });
     throw e;
   }
@@ -174,8 +198,10 @@ export async function requestKYCVerification() {
       throw new Error(response.data.message || 'Failed to send verification request.');
     }
   } catch (error) {
-    await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification'));
-    await logToIPFS({ error: (error as Error).message, context: 'requestKYCVerification' });
+    if (error instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification'));
+        await logToIPFS({ error: error.message, context: 'requestKYCVerification' });
+    }
     throw error;
   }
 }
