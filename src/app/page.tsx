@@ -12,16 +12,17 @@
 
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '@components/ui/button';
-import { Card, CardContent } from '@components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Sun } from 'lucide-react';
-import WaitingScreen from '@components/chat/waiting-screen';
-import VideoPlayer from '@components/chat/video-player';
-import ChatControls from '@components/chat/chat-controls';
-import ChatPanel from '@components/chat/chat-panel';
-import { useToast, toastPolitenessScore } from '@hooks/use-toast';
-import { auth, db, signInWithX } from '@lib/firebase/config';
-import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
+import WaitingScreen from '@/components/chat/waiting-screen';
+import VideoPlayer from '@/components/chat/video-player';
+import ChatControls from '@/components/chat/chat-controls';
+import ChatPanel from '@/components/chat/chat-panel';
+import { useToast } from '@/hooks/use-toast';
+import { auth, db } from '@/lib/firebase/config';
+import { signInWithX } from '@/lib/firebase';
+import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@/lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
 
 type ChatStatus = 'idle' | 'waiting' | 'connected';
@@ -191,6 +192,7 @@ export default function Home() {
                 </div>
               </div>
             );
+
           case 'idle':
           default:
             return (
