@@ -13,11 +13,12 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { Card } from '@components/ui/card';
-import { User, VideoOff, MicOff } from 'lucide-react';
+import { VideoOff, MicOff } from 'lucide-react';
 import { Badge } from '@components/ui/badge';
 import { useToast } from '@hooks/use-toast';
 import { db } from '@lib/firebase/config';
 import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { collection, addDoc } from 'firebase/firestore';
 
 type VideoPlayerProps = {
   isLocal: boolean;
@@ -33,9 +34,9 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-      videoRef.current.play().catch((e) => {
-        db.collection('logs').add(formatErrorLog(e, 'videoPlayerPlay'));
-        logToIPFS({ error: e.message, context: 'videoPlayerPlay' }); // IPFS (Day 4)
+      videoRef.current.play().catch(async (e) => {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'videoPlayerPlay'));
+        logToIPFS({ error: (e as Error).message, context: 'videoPlayerPlay' }); // IPFS (Day 4)
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to play video stream.' });
       });
     }
@@ -47,17 +48,17 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       timestamp: new Date(),
       context: 'video-player',
     };
-    db.collection('logs').add(streamLog).catch((e) => {
-      db.collection('logs').add(formatErrorLog(e, 'videoPlayerLog'));
-      logToIPFS({ error: e.message, context: 'videoPlayerLog' });
+    addDoc(collection(db, 'logs'), streamLog).catch(async (e) => {
+      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'videoPlayerLog'));
+      logToIPFS({ error: (e as Error).message, context: 'videoPlayerLog' });
     });
     logToIPFS(streamLog);
     // WebRTC signaling feedback (Day 4)
-    fetch('/api/stream', { method: 'POST', body: JSON.stringify(streamLog) }).catch((e) => {
-      db.collection('logs').add(formatErrorLog(e, 'streamSignal'));
-      logToIPFS({ error: e.message, context: 'streamSignal' });
+    fetch('/api/stream', { method: 'POST', body: JSON.stringify(streamLog) }).catch(async (e) => {
+      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'streamSignal'));
+      logToIPFS({ error: (e as Error).message, context: 'streamSignal' });
     });
-  }, [stream, isVideoOn, isMuted, isLocal]);
+  }, [stream, isVideoOn, isMuted, isLocal, toast]);
 
   return (
     <Card className="w-full h-full bg-muted/40 overflow-hidden relative flex items-center justify-center">
@@ -82,4 +83,4 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       </div>
     </Card>
   );
-} 
+}
