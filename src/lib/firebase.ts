@@ -4,20 +4,21 @@
 // - Added `updatePolitenessScore` which now also triggers the `setPolitenessClaim` Cloud Function.
 // - Kept all existing authentication methods.
 
-import { auth, db } from './firebase/config';
 import {
   signInWithPopup,
   TwitterAuthProvider,
   signInWithPhoneNumber,
   RecaptchaVerifier,
+  ConfirmationResult,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
-  User
+  User as FirebaseUser,
 } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { collection, addDoc, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { formatErrorLog, logToIPFS } from '@/lib/utils';
+import { auth, db } from './firebase/config';
 
 
 // Retry logic for Firestore writes
@@ -36,16 +37,16 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 // Helper to create user document in Firestore
-const createUserDocument = async (user: { uid: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null }) => {
-  const userRef = doc(db, 'users', user.uid);
-  const displayName = user.displayName || user.phoneNumber || 'Anonymous';
-  await withFirestoreRetry(() =>
-    setDoc(userRef, {
-      uid: user.uid,
+export const createUserDocument = async (userData: { uid: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null }) => {
+  const userRef = doc(db, 'users', userData.uid);
+  const displayName = userData.displayName || userData.phoneNumber || 'Anonymous';
+  
+  const serializableUserData = {
+      uid: userData.uid,
       displayName: displayName,
       displayName_lowercase: displayName.toLowerCase(),
-      email: user.email || null,
-      phoneNumber: user.phoneNumber || null,
+      email: userData.email || null,
+      phoneNumber: userData.phoneNumber || null,
       createdAt: serverTimestamp(),
       package: 'free', // Default to free package
       politenessScore: { ethical: 75, communication: 75, listener: 75, topics: 75 }, // Start with a neutral score
@@ -53,9 +54,12 @@ const createUserDocument = async (user: { uid: string; displayName?: string | nu
       olsPoints: 0, // Start with 0 points
       location: '',
       age: null,
-    }, { merge: true }) // Use merge to avoid overwriting existing data if user re-authenticates
+  };
+
+  await withFirestoreRetry(() =>
+    setDoc(userRef, serializableUserData, { merge: true }) // Use merge to avoid overwriting existing data if user re-authenticates
   );
-  await logToIPFS({ userId: user.uid, action: 'createUserDocument' });
+  await logToIPFS({ userId: userData.uid, action: 'createUserDocument' });
 };
 
 // Sign up with Email and Password
@@ -99,7 +103,7 @@ export async function signInWithX() {
   try {
     const result = await signInWithPopup(auth, new TwitterAuthProvider());
     const user = result.user;
-    await createUserDocument(user);
+    await createUserDocument({uid: user.uid, displayName: user.displayName, email: user.email});
     return user;
   } catch (e) {
     await withFirestoreRetry(() => {
@@ -113,7 +117,7 @@ export async function signInWithX() {
 }
 
 // Phone OTP Authentication
-export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) {
+export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier): Promise<ConfirmationResult> {
   try {
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
     await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
@@ -205,6 +209,3 @@ export async function requestKYCVerification() {
     throw error;
   }
 }
-
-
-export { createUserDocument };

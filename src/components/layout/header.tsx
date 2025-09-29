@@ -15,9 +15,8 @@ import {
   signInWithPhone,
   signUpWithEmail,
   signInWithEmail,
-  db,
   createUserDocument,
-} from '@lib/firebase/config';
+} from '@lib/firebase';
 import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';
@@ -42,6 +41,7 @@ import {
 import { Input } from '@components/ui/input';
 import { Label } from '@components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
+import { db } from '@/lib/firebase/config';
 
 export default function Header() {
   const { toast } = useToast();
@@ -158,7 +158,7 @@ export default function Header() {
     try {
       const result = await confirmationResult.confirm(verificationCode);
       const user = result.user;
-      await createUserDocument({ uid: user.uid, phoneNumber: user.phoneNumber, displayName: user.phoneNumber });
+      await createUserDocument({ uid: user.uid, phoneNumber: user.phoneNumber });
       toast({ title: 'Logged In', description: 'Phone authentication successful!' });
       setPhoneDialogOpen(false);
       setConfirmationResult(null);
