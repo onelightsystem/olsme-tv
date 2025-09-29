@@ -1,12 +1,12 @@
 // Path: src/components/layout/header.tsx
-// Improvements (Oct 1, 2025):
-// - Implemented Radix Dialogs for Email and Phone sign-in flows, improving UX.
-// - Added separate forms for Sign Up and Sign In with email/password.
-// - Integrated `RecaptchaVerifier` for secure phone authentication.
+// Improvements (Oct 2, 2025):
+// - Added Link to new /profile page.
+// - Kept Radix Dialogs for Email and Phone sign-in flows.
+// - Kept separate forms for Sign Up and Sign In.
 // - Maintained Twitter sign-in, biofeedback toggle, and branding.
-// - All authentication events are logged to Firestore and IPFS as required.
 
 'use client';
+import Link from 'next/link';
 import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import {
@@ -21,7 +21,7 @@ import {
 import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';
-import { RecaptchaVerifier, ConfirmationResult, signOut } from 'firebase/auth';
+import { RecaptchaVerifier, ConfirmationResult, signOut, User as FirebaseUser } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
 import {
   Dialog,
@@ -37,7 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
 
 export default function Header() {
   const { toast } = useToast();
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -176,8 +176,10 @@ export default function Header() {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 max-w-screen-2xl items-center">
           <div className="mr-4 flex items-center">
-            <Sun className="h-6 w-6 mr-2 stroke-[#FFD700]" />
-            <span className="font-bold font-headline">Awake Chat</span>
+            <Link href="/" className="flex items-center">
+              <Sun className="h-6 w-6 mr-2 stroke-[#FFD700]" />
+              <span className="font-bold font-headline">Awake Chat</span>
+            </Link>
           </div>
           <div className="flex flex-1 items-center justify-end gap-2">
             <Button variant="ghost" size="icon" onClick={handleBiofeedbackToggle} aria-label="Toggle biofeedback">
@@ -185,6 +187,12 @@ export default function Header() {
             </Button>
             {user ? (
                <>
+                <Link href="/profile">
+                  <Button variant="ghost" className="hidden sm:flex">
+                    <User className="h-5 w-5 mr-2 stroke-[#FFD700]" />
+                    Profile
+                  </Button>
+                </Link>
                 <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {user.displayName || 'Friend'}</span>
                 <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign Out">
                   <LogOut className="h-5 w-5 stroke-[#FFD700]" />
@@ -201,7 +209,7 @@ export default function Header() {
                     Phone
                 </Button>
                 <Button variant="ghost" size="icon" onClick={handleTwitterSignIn} aria-label="Login with X">
-                    <User className="h-5 w-5 stroke-[#FFD700]" />
+                    <Twitter className="h-5 w-5 stroke-[#FFD700]" />
                     <span className="sr-only">Login with X</span>
                 </Button>
               </>
@@ -230,8 +238,8 @@ export default function Header() {
                     <Input id="signin-email" type="email" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="col-span-3" required />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="signin-password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="text-right">Password</Label>
-                    <Input id="signin-password" type="password" className="col-span-3" required/>
+                    <Label htmlFor="signin-password" className="text-right">Password</Label>
+                    <Input id="signin-password" type="password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="col-span-3" required/>
                   </div>
                 </div>
                 <DialogFooter>
@@ -255,8 +263,8 @@ export default function Header() {
                     <Input id="signup-email" type="email" value={signUpEmail} onChange={(e) => setSignUpEmail(e.target.value)} className="col-span-3" required />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="signup-password" value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} className="text-right">Password</Label>
-                    <Input id="signup-password" type="password" className="col-span-3" required />
+                    <Label htmlFor="signup-password" className="text-right">Password</Label>
+                    <Input id="signup-password" type="password" value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} className="col-span-3" required />
                   </div>
                 </div>
                 <DialogFooter>

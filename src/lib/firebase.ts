@@ -1,10 +1,8 @@
 // Path: src/lib/firebase.ts
-// Improvements (Oct 1, 2025):
-// - Added Email/Password authentication (`signUpWithEmail`, `signInWithEmail`).
-// - Enhanced `signInWithX` and `signUpWithEmail` to create a user document in Firestore with a default 'free' package.
-// - Kept phone OTP (`signInWithPhone`), politeness score updates, and biofeedback logging.
-// - Added user document creation on sign-up to include `package: 'free'`.
-// - Aligns with blueprint: Establishes a clear path for Free/Premium user packages.
+// Improvements (Oct 2, 2025):
+// - Enhanced `createUserDocument` to include default `verificationLevel`, `olsPoints`.
+// - Added `updatePolitenessScore` which now also triggers the `setPolitenessClaim` Cloud Function.
+// - Kept all existing authentication methods.
 
 import { auth, db } from './firebase/config';
 import {
@@ -15,9 +13,12 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
+  User
 } from 'firebase/auth';
-import { collection, addDoc, updateDoc, doc, setDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { collection, addDoc, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { formatErrorLog, logToIPFS } from '@lib/utils';
+
 
 // Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
@@ -40,13 +41,18 @@ const createUserDocument = async (user: { uid: string; displayName?: string | nu
   await withFirestoreRetry(() =>
     setDoc(userRef, {
       uid: user.uid,
-      displayName: user.displayName || 'Anonymous',
+      displayName: user.displayName || user.phoneNumber || 'Anonymous',
       email: user.email || null,
       phoneNumber: user.phoneNumber || null,
-      createdAt: new Date(),
+      createdAt: serverTimestamp(),
       package: 'free', // Default to free package
-      politenessScore: { ethical: 0, communication: 0, listener: 0, topics: 0 },
-    })
+      politenessScore: { ethical: 75, communication: 75, listener: 75, topics: 75 }, // Start with a neutral score
+      verificationLevel: 'level1', // Start at level 1
+      olsPoints: 0, // Start with 0 points
+      name: '',
+      location: '',
+      age: null,
+    }, { merge: true }) // Use merge to avoid overwriting existing data if user re-authenticates
   );
   await logToIPFS({ userId: user.uid, action: 'createUserDocument' });
 };
@@ -84,7 +90,6 @@ export async function signInWithX() {
   try {
     const result = await signInWithPopup(auth, new TwitterAuthProvider());
     const user = result.user;
-    // This will create or overwrite the user document
     await createUserDocument(user);
     return user;
   } catch (e) {
@@ -98,7 +103,6 @@ export async function signInWithX() {
 export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) {
   try {
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-    // User document is created after confirmation in the UI component
     await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
     return confirmationResult;
   } catch (e) {
@@ -108,12 +112,24 @@ export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: Re
   }
 }
 
-// Update Politeness Score in Firestore
+// Update Politeness Score in Firestore and trigger claim update
 export async function updatePolitenessScore(userId: string, score: { ethical: number; communication: number; listener: number; topics: number }) {
   try {
     const userRef = doc(db, 'users', userId);
     await withFirestoreRetry(() => updateDoc(userRef, { politenessScore: score }));
     await logToIPFS({ userId, score, action: 'updatePolitenessScore' });
+
+    // Trigger the Cloud Function to update custom claims
+    const functions = getFunctions();
+    const setPolitenessClaim = httpsCallable(functions, 'setPolitenessClaim');
+    await setPolitenessClaim({ uid: userId, score });
+    
+    // Force refresh of the token to get the new claims on the client
+    const user = auth.currentUser;
+    if (user) {
+        await user.getIdToken(true);
+    }
+
   } catch (e) {
     await withFirestoreRetry(() => addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore')));
     await logToIPFS({ error: (e as Error).message, context: 'updatePolitenessScore' });

@@ -1,10 +1,9 @@
 // Path: functions/src/index.ts
-// Improvements (Oct 1, 2025):
-// - Added `upgradeToPremium` Cloud Function to handle user package upgrades.
-// - This function updates the user's `package` field in Firestore and sets a custom auth claim `isPremium: true`.
-// - Added security check to ensure only authenticated users can call the function.
-// - Kept `matchUsers` function for future use.
-// - Aligns with blueprint: Enables the freemium business model by providing a secure way to grant premium access.
+// Improvements (Oct 2, 2025):
+// - Added `setPolitenessClaim` Cloud Function to set custom claims based on politeness and verification.
+// - This function is callable from the client after a score update.
+// - It calculates the politeness level (Bronze, Silver, Gold) and sets it as a custom claim.
+// - It also reads the user's verificationLevel and sets it as a claim.
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
@@ -37,15 +36,10 @@ export const upgradeToPremium = functions.https.onCall(async (data, context) => 
     const userRef = db.collection('users').doc(uid);
 
     try {
-        // Here you would typically integrate with a payment provider like Stripe.
-        // For this example, we'll assume payment is successful.
-        // const paymentId = data.paymentId; 
-        
-        // Update user document in Firestore.
         await userRef.update({ package: 'premium' });
 
         // Set custom auth claim.
-        await admin.auth().setCustomUserClaims(uid, { isPremium: true });
+        await admin.auth().setCustomUserClaims(uid, { ...context.auth.token, isPremium: true });
 
         functions.logger.info(`User ${uid} successfully upgraded to premium.`);
         
@@ -53,9 +47,61 @@ export const upgradeToPremium = functions.https.onCall(async (data, context) => 
 
     } catch (error) {
         functions.logger.error(`Error upgrading user ${uid} to premium:`, error);
-        throw new functions.https.HttpsError(
+        throw new functions.httpsHttpsError(
             'internal',
             'An error occurred while upgrading the account.'
+        );
+    }
+});
+
+
+export const setPolitenessClaim = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            'unauthenticated',
+            'The function must be called while authenticated.'
+        );
+    }
+
+    const uid = context.auth.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    
+    if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'User not found.');
+    }
+
+    const userData = userDoc.data();
+    if (!userData) {
+      throw new functions.https.HttpsError('internal', 'User data is missing.');
+    }
+
+    const score = userData.politenessScore;
+    const average = (score.ethical + score.communication + score.listener + score.topics) / 4;
+    
+    let politenessLevel = 'bronze';
+    if (average >= 80) {
+        politenessLevel = 'gold';
+    } else if (average >= 60) {
+        politenessLevel = 'silver';
+    }
+
+    const verificationLevel = userData.verificationLevel || 'level1';
+
+    try {
+        await admin.auth().setCustomUserClaims(uid, { 
+            ...context.auth.token, // Preserve existing claims
+            politenessLevel: politenessLevel,
+            verificationLevel: verificationLevel
+        });
+        
+        functions.logger.info(`Claims set for user ${uid}: politenessLevel=${politenessLevel}, verificationLevel=${verificationLevel}`);
+        return { success: true, politenessLevel, verificationLevel };
+
+    } catch (error) {
+        functions.logger.error(`Error setting claims for user ${uid}:`, error);
+        throw new functions.https.HttpsError(
+            'internal',
+            'An error occurred while setting custom claims.'
         );
     }
 });

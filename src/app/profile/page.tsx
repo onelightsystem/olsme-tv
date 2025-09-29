@@ -1,0 +1,170 @@
+// Path: src/app/profile/page.tsx
+// Date: Oct 2, 2025
+// Description: User profile page to display verification level, politeness score, and package details.
+'use client';
+
+import { useEffect, useState } from 'react';
+import { auth, db } from '@lib/firebase/config';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { User as FirebaseUser } from 'firebase/auth';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
+import { Badge } from '@components/ui/badge';
+import { Progress } from '@components/ui/progress';
+import { Sun, ShieldCheck, Gem, Award } from 'lucide-react';
+import { formatPolitenessScore } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+
+type UserProfile = {
+  uid: string;
+  displayName: string;
+  email: string;
+  package: 'free' | 'premium';
+  verificationLevel: 'level1' | 'level2' | 'level3';
+  politenessScore: {
+    ethical: number;
+    communication: number;
+    listener: number;
+    topics: number;
+  };
+  olsPoints: number;
+  createdAt: any;
+};
+
+const verificationLevelText = {
+  level1: 'Level 1: Unverified',
+  level2: 'Level 2: Video Verified',
+  level3: 'Level 3: KYC Verified',
+};
+
+export default function ProfilePage() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribeAuth = auth.onAuthStateChanged((u) => {
+      setUser(u);
+      if (!u) {
+        setLoading(false);
+        setProfile(null);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setProfile(docSnap.data() as UserProfile);
+        } else {
+          console.log('No such document!');
+          setProfile(null);
+        }
+        setLoading(false);
+      });
+      return () => unsubscribeSnapshot();
+    }
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 max-w-2xl">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-6 w-1/4" />
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="container mx-auto p-4 text-center">
+        <h1 className="text-2xl font-bold">Please log in to view your profile.</h1>
+      </div>
+    );
+  }
+
+  const { average, badge, message } = formatPolitenessScore(profile.politenessScore);
+
+  return (
+    <div className="container mx-auto p-4 max-w-2xl">
+      <Card className="shadow-xl bg-card/80 backdrop-blur-sm">
+        <CardHeader className="text-center">
+          <Sun className="mx-auto h-12 w-12 text-primary mb-4" />
+          <CardTitle className="text-3xl font-bold">{profile.displayName}</CardTitle>
+          <CardDescription>{profile.email}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex justify-around text-center">
+            <div>
+              <p className="text-sm text-muted-foreground">Package</p>
+              <Badge variant={profile.package === 'premium' ? 'default' : 'secondary'} className="capitalize flex items-center gap-1">
+                <Gem className="h-4 w-4" /> {profile.package}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Verification</p>
+               <Badge variant="outline" className="capitalize flex items-center gap-1">
+                 <ShieldCheck className="h-4 w-4" /> {verificationLevelText[profile.verificationLevel]}
+               </Badge>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">OLS Points</p>
+               <Badge variant="outline" className="capitalize flex items-center gap-1">
+                 <Award className="h-4 w-4" /> {profile.olsPoints || 0}
+               </Badge>
+            </div>
+          </div>
+          
+          <div className="space-y-4 pt-4">
+            <h3 className="text-lg font-semibold text-center">Politeness Score</h3>
+            <div className="text-center">
+                <span className={`text-4xl font-bold ${
+                    badge === 'Gold' ? 'text-primary' : badge === 'Silver' ? 'text-slate-400' : 'text-yellow-700'
+                }`}>{average}</span>
+                <span className="text-muted-foreground">/100</span>
+            </div>
+            <Progress value={average} className="h-2" />
+            <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{badge}: {message}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-1">
+                <p>Ethical: {profile.politenessScore.ethical}</p>
+                <Progress value={profile.politenessScore.ethical} className="h-1" />
+            </div>
+            <div className="space-y-1">
+                <p>Communication: {profile.politenessScore.communication}</p>
+                <Progress value={profile.politenessScore.communication} className="h-1" />
+            </div>
+            <div className="space-y-1">
+                <p>Listener: {profile.politenessScore.listener}</p>
+                <Progress value={profile.politenessScore.listener} className="h-1" />
+            </div>
+            <div className="space-y-1">
+                <p>Topics: {profile.politenessScore.topics}</p>
+                <Progress value={profile.politenessScore.topics} className="h-1" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -22,6 +22,7 @@ import { formatErrorLog, logToIPFS } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
 import { collection, addDoc } from 'firebase/firestore';
+import { User as FirebaseUser } from 'firebase/auth';
 
 const ptSans = PT_Sans({ subsets: ['latin'], weight: ['400', '700'] });
 
@@ -41,10 +42,14 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((u) => {
+    const unsubscribe = auth.onAuthStateChanged(async (u) => {
+      if (u) {
+        // Force refresh of the token to get latest custom claims
+        await u.getIdToken(true);
+      }
       setUser(u);
       withFirestoreRetry(() =>
         addDoc(collection(db, 'logs'), {
@@ -56,7 +61,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         withFirestoreRetry(() =>
           addDoc(collection(db, 'logs'), formatErrorLog(e, 'layoutAuth'))
         );
-        logToIPFS({ error: e.message, context: 'layoutAuth' });
+        logToIPFS({ error: (e as Error).message, context: 'layoutAuth' });
       });
       if (u) logToIPFS({ userId: u.uid, action: 'auth_state', context: 'layout' });
     });
