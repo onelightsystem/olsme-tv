@@ -1,6 +1,6 @@
 // Path: src/lib/firebase.ts
 // Improvements (Oct 2, 2025):
-// - Enhanced `createUserDocument` to include default `verificationLevel`, `olsPoints`.
+// - Enhanced `createUserDocument` to include default `verificationLevel`, `olsPoints`, and a new `displayName_lowercase` field to support case-insensitive search.
 // - Added `updatePolitenessScore` which now also triggers the `setPolitenessClaim` Cloud Function.
 // - Kept all existing authentication methods.
 
@@ -38,10 +38,12 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 // Helper to create user document in Firestore
 const createUserDocument = async (user: { uid: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null }) => {
   const userRef = doc(db, 'users', user.uid);
+  const displayName = user.displayName || user.phoneNumber || 'Anonymous';
   await withFirestoreRetry(() =>
     setDoc(userRef, {
       uid: user.uid,
-      displayName: user.displayName || user.phoneNumber || 'Anonymous',
+      displayName: displayName,
+      displayName_lowercase: displayName.toLowerCase(),
       email: user.email || null,
       phoneNumber: user.phoneNumber || null,
       createdAt: serverTimestamp(),

@@ -2,12 +2,12 @@
 // Improvements (Oct 3, 2025):
 // - Replaced multiple login buttons with a single User profile icon.
 // - For guests, the icon opens a sign-in/sign-up dialog.
-// - For logged-in users, the icon opens a dropdown menu with links to Profile and a Sign Out button.
+// - For logged-in users, the icon opens a dropdown menu with links to Profile, Search, and a Sign Out button.
 // - Maintained all existing authentication logic (Email, Phone, Twitter).
 
 'use client';
 import Link from 'next/link';
-import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter } from 'lucide-react';
+import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import {
   auth,
@@ -193,6 +193,13 @@ export default function Header() {
             <Button variant="ghost" size="icon" onClick={handleBiofeedbackToggle} aria-label="Toggle biofeedback">
               <Volume2 className="h-5 w-5 stroke-[#FFD700]" />
             </Button>
+            {user && (
+               <Link href="/search" passHref>
+                <Button variant="ghost" size="icon" aria-label="Search users">
+                  <Search className="h-5 w-5 stroke-[#FFD700]" />
+                </Button>
+              </Link>
+            )}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -209,6 +216,13 @@ export default function Header() {
                       <span>Profile</span>
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/search" passHref>
+                     <DropdownMenuItem>
+                      <Search className="mr-2 h-4 w-4" />
+                      <span>Search Users</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>

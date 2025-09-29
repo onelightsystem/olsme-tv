@@ -4,6 +4,7 @@
 // - This function is callable from the client after a score update.
 // - It calculates the politeness level (Bronze, Silver, Gold) and sets it as a custom claim.
 // - It also reads the user's verificationLevel and sets it as a claim.
+// - Added `searchUsers` Cloud Function for case-insensitive displayName search and verification level filtering.
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
@@ -47,7 +48,7 @@ export const upgradeToPremium = functions.https.onCall(async (data, context) => 
 
     } catch (error) {
         functions.logger.error(`Error upgrading user ${uid} to premium:`, error);
-        throw new functions.httpsHttpsError(
+        throw new functions.https.HttpsError(
             'internal',
             'An error occurred while upgrading the account.'
         );
@@ -129,4 +130,59 @@ export const matchUsers = functions.https.onRequest(async (req, res) => {
       return res.status(500).json({ error: "Internal server error" });
     }
   });
+});
+
+export const searchUsers = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            'unauthenticated',
+            'You must be logged in to search for users.'
+        );
+    }
+
+    const { query, verificationLevel } = data;
+    const normalizedQuery = (query || '').trim().toLowerCase();
+
+    if (!normalizedQuery && !verificationLevel) {
+        return { users: [] };
+    }
+
+    let userQuery: admin.firestore.Query = db.collection('users');
+
+    // For case-insensitive search, we query against a stored lowercase field.
+    // This requires a composite index on (displayName_lowercase, verificationLevel).
+    if (normalizedQuery) {
+        userQuery = userQuery
+            .where('displayName_lowercase', '>=', normalizedQuery)
+            .where('displayName_lowercase', '<=', normalizedQuery + '\uf8ff');
+    }
+
+    if (verificationLevel && verificationLevel !== 'all') {
+        userQuery = userQuery.where('verificationLevel', '==', verificationLevel);
+    }
+
+    try {
+        const snapshot = await userQuery.limit(20).get();
+        const users = snapshot.docs.map(doc => {
+            const { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel } = doc.data();
+            return { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel };
+        });
+
+        // Log the search action
+        await db.collection('logs').add({
+            userId: context.auth.uid,
+            action: 'searchUsers',
+            query: data,
+            resultsCount: users.length,
+            timestamp: new Date(),
+        });
+
+        return { users };
+    } catch (error) {
+        functions.logger.error('Error searching users:', error);
+        throw new functions.https.HttpsError(
+            'internal',
+            'An error occurred while searching for users.'
+        );
+    }
 });
