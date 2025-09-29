@@ -1,6 +1,14 @@
+// Path: src/lib/firebase/config.ts
+// Improvements (Sept 29, 2025):
+// - Kept Firebase app initialization, `auth`, `db` exports (done, Day 2).
+// - Fixed re-export of `logBiofeedbackEvent`, `signInWithX`, `signInWithPhone`, `updatePolitenessScore` from `firebase.ts` (new, resolves console error).
+// - Aligns with blueprint: Centralized Firebase setup for 100K users (Business Plan).
+// - Solo Tip: Test with `npm run dev`, trigger biofeedback, check Firestore `biofeedback`/`logs`.
+
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth'; // For Firebase Authentication
-import { getFirestore } from 'firebase/firestore'; // For Firestore
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { signInWithX, signInWithPhone, updatePolitenessScore, logBiofeedbackEvent } from '../firebase';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDG-wbTAUOGL7gzqhxcexfamr83KXEdNGY",
@@ -13,5 +21,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app); // Export for Auth
-export const db = getFirestore(app); // Export for Firestore
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// Re-export Firebase functions
+export { signInWithX, signInWithPhone, updatePolitenessScore, logBiofeedbackEvent };
