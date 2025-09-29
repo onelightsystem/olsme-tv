@@ -12,7 +12,8 @@
 
 @layer base {
   :root {
-    --background: 60 4% 98%; /* #F5F5DC beige */
+    /* You can change the background color here. I've set it to a light beige (#F5F5DC). */
+    --background: 60 56% 91%; /* Light Beige */
     --foreground: 0 0% 15%; /* Dark for contrast */
     --card: 60 4% 96%;
     --card-foreground: 0 0% 15%;
