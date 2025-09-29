@@ -10,8 +10,8 @@
 
 'use client';
 import * as React from 'react';
-import { db } from '@lib/firebase/config';
-import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { db } from '@/lib/firebase/config';
+import { formatErrorLog, logToIPFS } from '@/lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
 
 const MOBILE_BREAKPOINT = 768;
@@ -35,8 +35,10 @@ export function useIsMobile() {
         context: 'useIsMobile',
       };
       addDoc(collection(db, 'logs'), logData).catch((e) => {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'useIsMobile'));
-        logToIPFS({ error: (e as Error).message, context: 'useIsMobile' });
+        if (e instanceof Error) {
+            addDoc(collection(db, 'logs'), formatErrorLog(e, 'useIsMobile'));
+            logToIPFS({ error: e.message, context: 'useIsMobile' });
+        }
       });
       logToIPFS({ ...logData, device: window.navigator.userAgent }); // Enhanced IPFS logging (Day 4)
     };

@@ -16,8 +16,8 @@ import { Card } from '@components/ui/card';
 import { VideoOff, MicOff } from 'lucide-react';
 import { Badge } from '@components/ui/badge';
 import { useToast } from '@hooks/use-toast';
-import { db } from '@lib/firebase/config';
-import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { db } from '@/lib/firebase/config';
+import { formatErrorLog, logToIPFS } from '@/lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
 
 type VideoPlayerProps = {

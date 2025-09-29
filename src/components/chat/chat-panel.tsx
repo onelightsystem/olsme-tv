@@ -1,7 +1,7 @@
 // Path: src/components/chat/chat-panel.tsx
 // Improvements (Sept 29, 2025):
 // - Kept text chat UI with Card, ScrollArea, AI politeness prompts (done, Day 5, blueprint).
-// - Fixed imports: Changed `auth`, `db` from `@lib/firebase` to `@lib/firebase/config` (new, resolves console error).
+// - Fixed imports: Changed `auth`, `db` from `@lib/firebase/config` (new, resolves console error).
 // - Kept `@ai/actions`, Firestore/IPFS logging, `toastPolitenessScore`, biofeedback (Day 2/5/11).
 // - Added validation for politeness scores (new, Day 5).
 // - Kept WebRTC signaling for prompts (Day 4).
@@ -17,8 +17,8 @@ import { ScrollArea } from '@components/ui/scroll-area';
 import { Send, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from '@components/ui/card';
 import { getPolitenessPrompt } from '@ai/actions';
-import { auth, db } from '@lib/firebase/config';
-import { triggerBiofeedback, formatPolitenessScore, formatErrorLog, logToIPFS } from '@utils';
+import { auth, db } from '@/lib/firebase/config';
+import { triggerBiofeedback, formatPolitenessScore, formatErrorLog, logToIPFS } from '@/lib/utils';
 import { useToast, toastPolitenessScore } from '@hooks/use-toast';
 import { collection, addDoc } from 'firebase/firestore';
 
@@ -77,8 +77,10 @@ export default function ChatPanel() {
       await addDoc(collection(db, 'control_logs'), { userId: user.uid, action: 'send_message', state: true, timestamp: new Date() });
       await fetch('/api/message', { method: 'POST', body: JSON.stringify(messageLog) });
     } catch (e) {
-      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'handleSendMessage'));
-      await logToIPFS({ error: e.message, context: 'handleSendMessage' });
+      if (e instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'handleSendMessage'));
+        await logToIPFS({ error: e.message, context: 'handleSendMessage' });
+      }
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to send message.' });
     }
 
@@ -104,8 +106,10 @@ export default function ChatPanel() {
       toastPolitenessScore(score);
       await fetch('/api/prompt', { method: 'POST', body: JSON.stringify({ prompt, userId: user.uid }) });
     } catch (e) {
-      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'getPolitenessPrompt'));
-      await logToIPFS({ error: e.message, context: 'getPolitenessPrompt' });
+      if (e instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'getPolitenessPrompt'));
+        await logToIPFS({ error: e.message, context: 'getPolitenessPrompt' });
+      }
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to get politeness prompt.' });
     }
   };
