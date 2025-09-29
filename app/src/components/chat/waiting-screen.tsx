@@ -14,7 +14,7 @@ import { Card, CardContent } from '@components/ui/card';
 import { Button } from '@components/ui/button';
 import { Sun } from 'lucide-react';
 import { OlsImages, logImageLoad, validateImageUrl } from '@lib/placeholder-images';
-import { triggerBiofeedback, logToIPFS } from '@lib/utils';
+import { triggerBiofeedback, logToIPFS } from '@/lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useIsMobile } from '@hooks/use-mobile';
 import { cn } from '@lib/utils';
