@@ -37,8 +37,10 @@ export default function WaitingScreen({ onCancel, userId }: WaitingScreenProps) 
   const [prompt, setPrompt] = useState('Initializing...');
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     // Set a random prompt only on the client-side to avoid hydration errors.
     const selectedPrompt = meditationPrompts[Math.floor(Math.random() * meditationPrompts.length)];
     setPrompt(selectedPrompt);
@@ -77,13 +79,14 @@ export default function WaitingScreen({ onCancel, userId }: WaitingScreenProps) 
     return () => clearInterval(poll);
   }, [userId, toast]);
 
+  // Only render the mobile-dependent class name on the client
+  const cardClassName = isClient ? cn(
+    'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm',
+    isMobile ? 'p-4' : 'p-8'
+  ) : 'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm p-8';
+
   return (
-    <Card
-      className={cn(
-        'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm',
-        isMobile ? 'p-4' : 'p-8'
-      )}
-    >
+    <Card className={cardClassName}>
       <CardContent className="p-8 flex flex-col items-center">
         <Sun className="h-12 w-12 stroke-[#FFD700] fill-none animate-loading-sun mb-6" />
         <h2 className="text-2xl font-bold font-headline text-foreground mb-2">
