@@ -4,7 +4,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db, requestKYCVerification } from '@lib/firebase/config';
+import { auth, db } from '@lib/firebase/config';
+import { requestKYCVerification } from '@lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@components/ui/card';

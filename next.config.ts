@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  srcDir: 'src',
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)
   },

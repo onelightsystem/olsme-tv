@@ -10,13 +10,13 @@ import Link from 'next/link';
 import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search, Shield } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import {
-  auth,
   signInWithX,
   signInWithPhone,
   signUpWithEmail,
   signInWithEmail,
   createUserDocument,
 } from '@lib/firebase';
+import { auth } from '@lib/firebase/config';
 import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';

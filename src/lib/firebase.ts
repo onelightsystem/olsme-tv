@@ -216,8 +216,4 @@ export async function requestKYCVerification() {
   }
 }
 
-// Re-export Firebase functions and instances
-export {
-  updatePolitenessScore,
-  logBiofeedbackEvent,
-};
+// Firebase functions and instances are exported directly where they are defined.
