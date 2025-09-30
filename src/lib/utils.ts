@@ -13,7 +13,10 @@
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { logBiofeedbackEvent } from '@lib/firebase';
+import { logBiofeedbackEvent } from '@/lib/firebase';
+import { db } from '@/lib/firebase/config';
+import { collection, addDoc } from 'firebase/firestore';
+
 
 // Merge classes with Tailwind support (done, shadcn)
 export function cn(...inputs: ClassValue[]) {
@@ -70,7 +73,7 @@ export async function triggerBiofeedback(userId: string, type: 'wait' | 'chat', 
     validateBiofeedbackEvent(userId, event);
     await logBiofeedbackEvent(userId, event);
     return { success: true, message: 'Biofeedback triggered: Red Sea waves' };
-  } catch (e) {
+  } catch (e: any) {
     const errorEvent = { type: 'error', value: 0 };
     validateBiofeedbackEvent(userId, errorEvent);
     await logBiofeedbackEvent(userId, errorEvent);
@@ -95,17 +98,21 @@ export async function logToIPFS(data: any) {
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid IPFS data');
     }
-    const ipfs = await import('ipfs-http-client').then(({ create }) => create({ url: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001' }));
+    const { create } = await import('ipfs-http-client');
+    const ipfs = create({ url: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001' });
     const result = await ipfs.add(JSON.stringify(data));
     const cid = result.cid.toString();
     const event = { type: 'ipfs_log', value: 1, cid };
     validateBiofeedbackEvent('system', event);
     await logBiofeedbackEvent('system', event);
     return cid;
-  } catch (e) {
+  } catch (e: any) {
     const errorEvent = { type: 'ipfs_error', value: 0 };
     validateBiofeedbackEvent('system', errorEvent);
     await logBiofeedbackEvent('system', errorEvent);
-    throw new Error(`IPFS logging failed: ${e.message}`);
+    // Log the error to Firestore as well for easier debugging
+    await addDoc(collection(db, 'logs'), formatErrorLog(e, 'logToIPFS'));
+    console.error(`IPFS logging failed: ${e.message}`);
+    // We don't re-throw the error to avoid crashing the app if IPFS is down.
   }
 }

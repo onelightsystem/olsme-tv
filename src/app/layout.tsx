@@ -22,6 +22,8 @@ import { formatErrorLog, logToIPFS } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
 import { collection, addDoc } from 'firebase/firestore';
+import { User as FirebaseUser } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const ptSans = PT_Sans({ subsets: ['latin'], weight: ['400', '700'] });
 
@@ -41,27 +43,60 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((u) => {
+    const functions = getFunctions();
+    const updateUserStatus = httpsCallable(functions, 'updateUserStatus');
+
+    const handleVisibilityChange = () => {
+      if (auth.currentUser) {
+        const status = document.visibilityState === 'visible' ? 'online' : 'offline';
+        updateUserStatus({ status }).catch(console.error);
+      }
+    };
+    
+    const handleBeforeUnload = () => {
+        if(auth.currentUser) {
+            updateUserStatus({ status: 'offline' }).catch(console.error);
+        }
+    };
+
+    const unsubscribe = auth.onAuthStateChanged(async (u) => {
+      if (u) {
+        // Force refresh of the token to get latest custom claims (e.g., isAdmin)
+        await u.getIdToken(true);
+        updateUserStatus({ status: 'online' }).catch(console.error);
+      } else if (user) { // User signed out
+        updateUserStatus({ status: 'offline' }).catch(console.error);
+      }
+
       setUser(u);
       withFirestoreRetry(() =>
         addDoc(collection(db, 'logs'), {
           userId: u?.uid || 'anonymous',
           context: 'layout_auth',
+          status: u ? 'loggedIn' : 'loggedOut',
           timestamp: new Date(),
         })
       ).catch((e) => {
         withFirestoreRetry(() =>
           addDoc(collection(db, 'logs'), formatErrorLog(e, 'layoutAuth'))
         );
-        logToIPFS({ error: e.message, context: 'layoutAuth' });
+        logToIPFS({ error: (e as Error).message, context: 'layoutAuth' });
       });
       if (u) logToIPFS({ userId: u.uid, action: 'auth_state', context: 'layout' });
     });
-    return () => unsubscribe();
-  }, []);
+    
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [user]);
 
   return (
     <html lang="en" className={ptSans.className} suppressHydrationWarning>

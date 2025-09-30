@@ -15,23 +15,6 @@ const nextConfig = {
       { protocol: 'https', hostname: 'olsme.com', pathname: '/assets/**' }, // OLS meditation assets
     ],
   },
-  turbopack: {
-    root: './',
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'], // Hand-drawn Sun icons (blueprint)
-        as: '*.js',
-      },
-    },
-    resolveAlias: {
-      '@ols-components': './src/components', // Biofeedback prompts (Day 11)
-      '@lib': './src/lib', // Firebase, IPFS utils (Day 2/4)
-      '@ui': './src/components/ui', // shadcn UI components
-      '@utils': './src/lib/utils', // shadcn utilities
-      '@hooks': './src/hooks', // Custom hooks (e.g., auth)
-    },
-    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json', '.mdx'],
-  },
   env: {
     // Secure Firebase keys (Day 2, avoid hardcoding)
     FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,

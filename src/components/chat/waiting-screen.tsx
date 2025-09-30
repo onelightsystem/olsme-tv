@@ -13,11 +13,11 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@components/ui/card';
 import { Button } from '@components/ui/button';
 import { Sun } from 'lucide-react';
-import { OlsImages, logImageLoad, validateImageUrl } from '@lib/placeholder-images';
-import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@utils';
+import { OlsImages, logImageLoad, validateImageUrl } from '@/lib/placeholder-images';
+import { triggerBiofeedback, logToIPFS } from '@/lib/utils';
 import { useToast } from '@hooks/use-toast';
 import { useIsMobile } from '@hooks/use-mobile';
-import { cn } from '@utils';
+import { cn } from '@lib/utils';
 
 const meditationPrompts = [
   'Take a deep breath, in and out.',
@@ -34,28 +34,34 @@ type WaitingScreenProps = {
 };
 
 export default function WaitingScreen({ onCancel, userId }: WaitingScreenProps) {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState('Initializing...');
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+    // Set a random prompt only on the client-side to avoid hydration errors.
     const selectedPrompt = meditationPrompts[Math.floor(Math.random() * meditationPrompts.length)];
     setPrompt(selectedPrompt);
+
     triggerBiofeedback(userId, 'wait')
       .then(() => {
         toast({
           title: 'Meditation Prompt',
           description: selectedPrompt,
         });
-        logToIPFS({ prompt, userId }); // IPFS (Day 4)
+        logToIPFS({ prompt: selectedPrompt, userId }); // IPFS (Day 4)
       })
       .catch((e) => {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to play biofeedback audio.' });
       });
+      
     validateImageUrl(OlsImages[0].imageUrl).then((valid) => {
       if (valid) logImageLoad(OlsImages[0].id, 'waiting-screen');
       else toast({ variant: 'destructive', title: 'Error', description: 'Failed to load OLS image.' });
     });
+
     // Mock WebRTC signaling (Day 4)
     const poll = setInterval(async () => {
       try {
@@ -66,19 +72,21 @@ export default function WaitingScreen({ onCancel, userId }: WaitingScreenProps) 
           logToIPFS({ match: data.match, userId }); // IPFS
         }
       } catch (e) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to check match status.' });
+        // This is a mock API, so we can ignore fetch errors in the console for now.
       }
     }, 5000);
+    
     return () => clearInterval(poll);
   }, [userId, toast]);
 
+  // Only render the mobile-dependent class name on the client
+  const cardClassName = isClient ? cn(
+    'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm',
+    isMobile ? 'p-4' : 'p-8'
+  ) : 'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm p-8';
+
   return (
-    <Card
-      className={cn(
-        'w-full max-w-md text-center shadow-xl bg-card/80 backdrop-blur-sm',
-        isMobile ? 'p-4' : 'p-8'
-      )}
-    >
+    <Card className={cardClassName}>
       <CardContent className="p-8 flex flex-col items-center">
         <Sun className="h-12 w-12 stroke-[#FFD700] fill-none animate-loading-sun mb-6" />
         <h2 className="text-2xl font-bold font-headline text-foreground mb-2">

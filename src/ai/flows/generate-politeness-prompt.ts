@@ -7,8 +7,9 @@
 // - Solo Tip: Test with `npm run genkit:dev`, check Firestore `prompts`/`logs`, IPFS CID.
 
 import { z } from 'zod';
-import { db, formatErrorLog } from '@lib/firebase';
-import { logToIPFS } from '@lib/utils';
+import { db } from '@/lib/firebase/config';
+import { formatErrorLog } from '@/lib/utils';
+import { logToIPFS } from '@/lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
 import { getPolitenessPrompt } from '../actions';
 
@@ -38,8 +39,10 @@ export async function generatePolitenessPrompt(input: GeneratePolitenessPromptIn
     await logToIPFS({ prompt, conversationHistory: validatedInput.conversationHistory, userId });
     return { politenessPrompt: prompt };
   } catch (e) {
-    await addDoc(collection(db, 'logs'), formatErrorLog(e, 'generatePolitenessPrompt'));
-    await logToIPFS({ error: e.message, context: 'generatePolitenessPrompt' });
+    if (e instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'generatePolitenessPrompt'));
+        await logToIPFS({ error: e.message, context: 'generatePolitenessPrompt' });
+    }
     throw e;
   }
 }

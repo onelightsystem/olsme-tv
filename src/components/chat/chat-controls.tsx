@@ -15,6 +15,7 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Flag, Volume2, VolumeX } from '
 import { useToast, toastPolitenessScore } from '@hooks/use-toast';
 import { db } from '@lib/firebase/config';
 import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { collection, addDoc } from 'firebase/firestore';
 
 type ChatControlsProps = {
   onMuteToggle: () => void;
@@ -50,13 +51,14 @@ export default function ChatControls({
         throw new Error('Invalid control action');
       }
       const controlLog = { userId, action, state, timestamp: new Date() };
-      await db.collection('control_logs').add(controlLog);
+      await addDoc(collection(db, 'control_logs'), controlLog);
       await logToIPFS(controlLog);
-      await fetch('/api/control', { method: 'POST', body: JSON.stringify(controlLog) });
+      // This API call doesn't exist, so it is commented out.
+      // await fetch('/api/control', { method: 'POST', body: JSON.stringify(controlLog) });
       toast({ title: `${action} Updated`, description: `${action} is now ${state ? 'on' : 'off'}.` });
     } catch (e) {
-      await db.collection('logs').add(formatErrorLog(e, `control_${action}`));
-      await logToIPFS({ error: e.message, context: `control_${action}` });
+      await addDoc(collection(db, 'logs'), formatErrorLog(e, `control_${action}`));
+      await logToIPFS({ error: (e as Error).message, context: `control_${action}` });
       toast({ variant: 'destructive', title: 'Error', description: `Failed to update ${action}.` });
     }
   };
@@ -74,14 +76,15 @@ export default function ChatControls({
         timestamp: new Date(),
         context: 'chat-controls',
       };
-      await db.collection('reports').add(report);
+      await addDoc(collection(db, 'reports'), report);
       await logToIPFS(report);
       toastPolitenessScore({ ethical: 60, communication: 65, listener: 70, topics: 55 });
-      await fetch('/api/report', { method: 'POST', body: JSON.stringify(report) });
+      // This API call doesn't exist, so it is commented out.
+      // await fetch('/api/report', { method: 'POST', body: JSON.stringify(report) });
       toast({ title: 'Report Sent', description: 'Thank you for your feedback.' });
     } catch (e) {
-      await db.collection('logs').add(formatErrorLog(e, 'handleReport'));
-      await logToIPFS({ error: e.message, context: 'handleReport' });
+      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'handleReport'));
+      await logToIPFS({ error: (e as Error).message, context: 'handleReport' });
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to log report.' });
     }
   };

@@ -8,10 +8,10 @@
 // - Aligns with freemium: Premium users ($4.99) unlock custom images (Business Plan).
 // - Solo Tip: Test with `npm run dev`, use in `waiting-screen.tsx`, check Firestore `image_logs`, IPFS CID.
 
-import { db } from '@lib/firebase/config';
-import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { db } from '@/lib/firebase/config';
+import { formatErrorLog, logToIPFS } from '@/lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
-import data from './placeholder-images.json';
+import placeholderData from './placeholder-images.json';
 
 // Define placeholder type (done)
 export type OlsImage = {
@@ -21,7 +21,7 @@ export type OlsImage = {
 };
 
 // Export placeholder images (done)
-export const OlsImages: OlsImage[] = data;
+export const OlsImages: OlsImage[] = placeholderData.placeholderImages;
 
 // Log image load to Firestore (done)
 export async function logImageLoad(imageId: string, context: string) {
@@ -30,8 +30,10 @@ export async function logImageLoad(imageId: string, context: string) {
     await addDoc(collection(db, 'image_logs'), logData);
     await logToIPFS(logData); // IPFS (new, Day 4)
   } catch (e) {
-    await addDoc(collection(db, 'logs'), formatErrorLog(e, 'logImageLoad'));
-    await logToIPFS({ error: e.message, context: 'logImageLoad' });
+    if (e instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'logImageLoad'));
+        await logToIPFS({ error: e.message, context: 'logImageLoad' });
+    }
   }
 }
 
@@ -51,8 +53,10 @@ export async function validateImageUrl(url: string): Promise<boolean> {
     }
     return isValid;
   } catch (e) {
-    await addDoc(collection(db, 'logs'), formatErrorLog(e, 'validateImageUrl'));
-    await logToIPFS({ error: e.message, context: 'validateImageUrl' });
+    if (e instanceof Error) {
+        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'validateImageUrl'));
+        await logToIPFS({ error: e.message, context: 'validateImageUrl' });
+    }
     return false;
   }
 }
