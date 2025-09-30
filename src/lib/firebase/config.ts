@@ -1,3 +1,4 @@
+
 // Path: src/lib/firebase/config.ts
 // Improvements (Oct 1, 2025):
 // - Added `signUpWithEmail` and `signInWithEmail` to the re-exports.
@@ -5,10 +6,10 @@
 // - Centralizes all auth-related functions for easier import across the app.
 // - Added Firebase Analytics.
 
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDG-wbTAUOGL7gzqhxcexfamr83KXEdNGY",
@@ -21,11 +22,18 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Initialize Analytics and export it
-const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
+let analytics: Analytics | null = null;
+
+if (typeof window !== 'undefined') {
+    isSupported().then(yes => {
+        if (yes) {
+            analytics = getAnalytics(app);
+        }
+    });
+}
 
 export { analytics };
