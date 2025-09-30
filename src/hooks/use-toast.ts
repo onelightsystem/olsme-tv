@@ -1,14 +1,20 @@
 // Path: src/hooks/use-toast.ts
-// Improvements (Sept 28, 2025):
-// - Kept shadcn’s `useToast` and `toast` for notifications (done, Day 11, report feedback).
-// - Kept `toastPolitenessScore` for AI Politeness Monitor feedback (done, Day 5).
-// - Aligned with blueprint: Toasts for user feedback (e.g., “Match found!”) counter elite-driven chaos.
-// - Solo Tip: Test with `npm run dev`, trigger in `waiting-screen.tsx`, log toast errors in Firestore.
-
+// Improvements (Sept 30, 2025):
+// - Added premium user check for enhanced politeness messages (freemium model, $4.99/month).
+// - Added Firestore/IPFS logging for toast errors (aligns with other components).
+// - Added ARIA attributes for accessibility (GDPR compliance).
+// - Kept shadcn’s `useToast` and `toast` for notifications (Day 11).
+// - Kept `toastPolitenessScore` for AI Politeness Monitor feedback (Day 5).
+// - Aligned with blueprint: Toasts for user feedback counter elite-driven chaos.
+// - Solo Tip: Test with `npm run dev`, trigger in `waiting-screen.tsx`, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import * as React from 'react';
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast';
 import { formatPolitenessScore } from '@lib/utils';
+import { logToIPFS } from '@lib/ipfs-client';
+import { db, auth } from '@/lib/firebase/config';
+import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { triggerBiofeedback } from '@lib/utils';
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -28,12 +34,14 @@ const actionTypes = {
 } as const;
 
 let count = 0;
+
 function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER;
   return count.toString();
 }
 
 type ActionType = typeof actionTypes;
+
 type Action =
   | { type: ActionType['ADD_TOAST']; toast: ToasterToast }
   | { type: ActionType['UPDATE_TOAST']; toast: Partial<ToasterToast> }
@@ -94,28 +102,187 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>;
 
-function toast({ ...props }: Toast) {
+async function toast({ ...props }: Toast) {
   const id = genId();
+  const user = auth.currentUser;
+  const isPremium = user ? (await getDoc(doc(db, 'users', user.uid))).data()?.package === 'premium' : false;
+
   const update = (props: ToasterToast) => dispatch({ type: 'UPDATE_TOAST', toast: { ...props, id } });
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
-  dispatch({
-    type: 'ADD_TOAST',
-    toast: { ...props, id, open: true, onOpenChange: (open) => { if (!open) dismiss(); } },
-  });
-  return { id, dismiss, update };
+
+  try {
+    dispatch({
+      type: 'ADD_TOAST',
+      toast: {
+        ...props,
+        id,
+        open: true,
+        onOpenChange: (open) => {
+          if (!open) dismiss();
+        },
+        'aria-live': 'polite', // Accessibility
+      },
+    });
+
+    // Log toast to Firestore and IPFS
+    const batch = writeBatch(db);
+    batch.set(collection(db, 'logs').doc(), {
+      userId: user?.uid || 'anonymous',
+      context: 'toast',
+      title: props.title,
+      description: props.description,
+      timestamp: new Date(),
+    });
+    batch.set(collection(db, 'biofeedback_events').doc(), {
+      userId: user?.uid || 'anonymous',
+      type: 'toast_display',
+      value: 1,
+      timestamp: new Date(),
+    });
+    await batch.commit();
+
+    await logToIPFS({
+      userId: user?.uid || 'anonymous',
+      action: 'toast_display',
+      title: props.title,
+      description: props.description,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Mindfulness: Trigger calming audio for premium users
+    if (user && isPremium) {
+      await triggerBiofeedback(user.uid, 'chat', 'https://olsme.com/assets/premium-waves.mp3');
+    }
+
+    return { id, dismiss, update };
+  } catch (e: any) {
+    const batch = writeBatch(db);
+    batch.set(collection(db, 'logs').doc(), {
+      userId: user?.uid || 'anonymous',
+      context: 'toast_error',
+      error: e.message,
+      timestamp: new Date(),
+    });
+    batch.set(collection(db, 'biofeedback_events').doc(), {
+      userId: user?.uid || 'anonymous',
+      type: 'error',
+      value: 0,
+      timestamp: new Date(),
+    });
+    await batch.commit();
+
+    await logToIPFS({
+      error: e.message,
+      context: 'toast_error',
+      userId: user?.uid || 'anonymous',
+      action: 'error',
+      timestamp: new Date().toISOString(),
+    });
+
+    if (user) {
+      await triggerBiofeedback(user.uid, 'chat');
+    }
+
+    return { id, dismiss, update };
+  }
 }
 
-function toastPolitenessScore(score: { ethical: number; communication: number; listener: number; topics: number }) {
-  const { badge, message } = formatPolitenessScore(score);
-  return toast({
-    title: `Politeness: ${badge}`,
-    description: message,
-    action: badge === 'Bronze' ? { label: 'Improve', onClick: () => window.location.href = '/tips' } : undefined,
-  });
+async function toastPolitenessScore({
+  ethical,
+  communication,
+  listener,
+  topics,
+  userId = 'anonymous',
+  isPremium = false,
+}: {
+  ethical: number;
+  communication: number;
+  listener: number;
+  topics: number;
+  userId?: string;
+  isPremium?: boolean;
+}) {
+  try {
+    const { badge, message } = await formatPolitenessScore({ ethical, communication, listener, topics }, userId);
+    const enhancedMessage = isPremium
+      ? `${message} - Premium insights for mindful chats!`
+      : message;
+
+    const toastProps = {
+      title: `Politeness: ${badge}`,
+      description: enhancedMessage,
+      action: badge === 'Bronze' ? { label: 'Improve', onClick: () => window.location.href = '/tips' } : undefined,
+      'aria-live': 'polite' as const, // Accessibility
+    };
+
+    const batch = writeBatch(db);
+    batch.set(collection(db, 'politeness_scores').doc(), {
+      userId,
+      score: { ethical, communication, listener, topics },
+      badge,
+      timestamp: new Date(),
+    });
+    batch.set(collection(db, 'biofeedback_events').doc(), {
+      userId,
+      type: 'politeness_toast',
+      value: 1,
+      timestamp: new Date(),
+    });
+    await batch.commit();
+
+    await logToIPFS({
+      userId,
+      action: 'politeness_toast',
+      badge,
+      message: enhancedMessage,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Mindfulness: Trigger calming audio for premium users
+    if (isPremium && auth.currentUser) {
+      await triggerBiofeedback(auth.currentUser.uid, 'chat', 'https://olsme.com/assets/premium-waves.mp3');
+    }
+
+    return toast(toastProps);
+  } catch (e: any) {
+    const batch = writeBatch(db);
+    batch.set(collection(db, 'logs').doc(), {
+      userId,
+      context: 'toastPolitenessScore_error',
+      error: e.message,
+      timestamp: new Date(),
+    });
+    batch.set(collection(db, 'biofeedback_events').doc(), {
+      userId,
+      type: 'error',
+      value: 0,
+      timestamp: new Date(),
+    });
+    await batch.commit();
+
+    await logToIPFS({
+      error: e.message,
+      context: 'toastPolitenessScore_error',
+      userId,
+      action: 'error',
+      timestamp: new Date().toISOString(),
+    });
+
+    if (auth.currentUser) {
+      await triggerBiofeedback(auth.currentUser.uid, 'chat');
+    }
+
+    return toast({
+      title: 'Politeness: Error',
+      description: 'Failed to display politeness score.',
+      'aria-live': 'polite',
+    });
+  }
 }
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
+
   React.useEffect(() => {
     listeners.push(setState);
     return () => {
@@ -123,7 +290,13 @@ function useToast() {
       if (index > -1) listeners.splice(index, 1);
     };
   }, [state]);
-  return { ...state, toast, toastPolitenessScore, dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }) };
+
+  return {
+    ...state,
+    toast,
+    toastPolitenessScore,
+    dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }),
+  };
 }
 
 export { useToast, toast, toastPolitenessScore };

@@ -1,0 +1,138 @@
+.
+├── apphosting.yaml
+├── components.json
+├── docs
+│   └── blueprint.md
+├── firebase.json
+├── firestore.rules
+├── functions
+│   ├── firebase-debug.log
+│   ├── functions
+│   │   └── package.json
+│   ├── lib
+│   │   ├── index.js
+│   │   └── index.js.map
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── src
+│   │   └── index.ts
+│   ├── tsconfig.dev.json
+│   └── tsconfig.json
+├── next-env.d.ts
+├── next.config.ts
+├── out
+│   ├── _next
+│   │   ├── static
+│   │   │   ├── chunks
+│   │   │   │   ├── 255-23f2be21cc66949d.js
+│   │   │   │   ├── 4bd1b696-21f374d1156f834a.js
+│   │   │   │   ├── 732-7e53ef2a744a6813.js
+│   │   │   │   ├── 747-aa28d88b8366c3e7.js
+│   │   │   │   ├── 933-1ba1efa53f7ecfcc.js
+│   │   │   │   ├── app
+│   │   │   │   │   ├── _not-found
+│   │   │   │   │   │   └── page-74f4a4487b537ce2.js
+│   │   │   │   │   ├── layout-aff5cbc1b5ec2ba5.js
+│   │   │   │   │   └── page-00f301ab02451bb4.js
+│   │   │   │   ├── framework-a6e0b7e30f98059a.js
+│   │   │   │   ├── main-8ae80e654950d758.js
+│   │   │   │   ├── main-app-9b37515ce1d76144.js
+│   │   │   │   ├── pages
+│   │   │   │   │   ├── _app-7d307437aca18ad4.js
+│   │   │   │   │   └── _error-cb2a52f75f2162e2.js
+│   │   │   │   ├── polyfills-42372ed130431b0a.js
+│   │   │   │   └── webpack-305d99588bad0856.js
+│   │   │   ├── css
+│   │   │   │   └── 8203db5c0706db7d.css
+│   │   │   └── ZzMixLzWWfo_cpZ1GyrLK
+│   │   │       ├── _buildManifest.js
+│   │   │       └── _ssgManifest.js
+│   │   └── ZzMixLzWWfo_cpZ1GyrLK
+│   ├── 404.html
+│   ├── favicon.ico
+│   ├── index.html
+│   └── index.txt
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── README.md
+├── src
+│   ├── ai
+│   │   ├── actions.ts
+│   │   ├── dev.ts
+│   │   ├── flows
+│   │   │   └── generate-politeness-prompt.ts
+│   │   └── genkit.ts
+│   ├── app
+│   │   ├── admin
+│   │   │   └── users
+│   │   │       └── page.tsx
+│   │   ├── favicon.ico
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── metadata.ts
+│   │   ├── page.tsx
+│   │   ├── profile
+│   │   │   └── page.tsx
+│   │   └── search
+│   │       └── page.tsx
+│   ├── components
+│   │   ├── chat
+│   │   │   ├── chat-controls.tsx
+│   │   │   ├── chat-panel.tsx
+│   │   │   ├── video-player.tsx
+│   │   │   └── waiting-screen.tsx
+│   │   ├── layout
+│   │   │   └── header.tsx
+│   │   └── ui
+│   │       ├── accordion.tsx
+│   │       ├── alert-dialog.tsx
+│   │       ├── alert.tsx
+│   │       ├── avatar.tsx
+│   │       ├── badge.tsx
+│   │       ├── button.tsx
+│   │       ├── calendar.tsx
+│   │       ├── card.tsx
+│   │       ├── carousel.tsx
+│   │       ├── chart.tsx
+│   │       ├── checkbox.tsx
+│   │       ├── collapsible.tsx
+│   │       ├── dialog.tsx
+│   │       ├── dropdown-menu.tsx
+│   │       ├── form.tsx
+│   │       ├── input.tsx
+│   │       ├── label.tsx
+│   │       ├── menubar.tsx
+│   │       ├── popover.tsx
+│   │       ├── progress.tsx
+│   │       ├── radio-group.tsx
+│   │       ├── scroll-area.tsx
+│   │       ├── select.tsx
+│   │       ├── separator.tsx
+│   │       ├── sheet.tsx
+│   │       ├── sidebar.tsx
+│   │       ├── skeleton.tsx
+│   │       ├── slider.tsx
+│   │       ├── switch.tsx
+│   │       ├── table.tsx
+│   │       ├── tabs.tsx
+│   │       ├── textarea.tsx
+│   │       ├── toast.tsx
+│   │       ├── toaster.tsx
+│   │       └── tooltip.tsx
+│   ├── hooks
+│   │   ├── use-mobile.tsx
+│   │   └── use-toast.ts
+│   └── lib
+│       ├── firebase
+│       │   └── config.ts
+│       ├── firebase.ts
+│       ├── placeholder-images.json
+│       ├── placeholder-images.ts
+│       └── utils.ts
+├── tailwind.config.ts
+├── tree.txt
+├── tsconfig.json
+└── tsconfig.tsbuildinfo
+
+31 directories, 105 files

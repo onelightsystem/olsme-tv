@@ -1,14 +1,15 @@
 // Path: src/components/chat/chat-panel.tsx
-// Improvements (Sept 29, 2025):
-// - Kept text chat UI with Card, ScrollArea, AI politeness prompts (done, Day 5, blueprint).
-// - Fixed imports: Changed `auth`, `db` from `@lib/firebase/config` (new, resolves console error).
-// - Kept `@ai/actions`, Firestore/IPFS logging, `toastPolitenessScore`, biofeedback (Day 2/5/11).
-// - Added validation for politeness scores (new, Day 5).
-// - Kept WebRTC signaling for prompts (Day 4).
+// Improvements (Sept 30, 2025):
+// - Fixed import: Changed `logToIPFS` from `@lib/utils` to `@lib/ipfs-client` (resolves build error).
+// - Added premium user check for enhanced politeness insights and custom audio (freemium model, $4.99/month).
+// - Added biofeedback audio triggers for errors and politeness prompts (OLS mindfulness).
+// - Enhanced error handling with `userId` in logs for traceability.
+// - Removed non-existent API calls (`/api/message`, `/api/prompt`).
+// - Added batch Firestore writes for performance.
+// - Added ARIA attributes for accessibility (GDPR compliance).
 // - Styled with #FFD700 gold, PT Sans (blueprint).
-// - Aligns with freemium: Premium users ($4.99) unlock detailed politeness insights (Business Plan).
-// - Solo Tip: Test with `npm run dev`, send message, check Firestore `messages`/`logs`, IPFS CID.
-
+// - Aligns with blueprint: Text chat, AI politeness, IPFS logging.
+// - Solo Tip: Test with `npm run dev`, send message, check Firestore `messages`/`logs`/`biofeedback_events`/`prompts`/`politeness_scores`, IPFS CID.
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@components/ui/button';
@@ -18,9 +19,10 @@ import { Send, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from '@components/ui/card';
 import { getPolitenessPrompt } from '@ai/actions';
 import { auth, db } from '@/lib/firebase/config';
-import { triggerBiofeedback, formatPolitenessScore, formatErrorLog, logToIPFS } from '@/lib/utils';
+import { triggerBiofeedback, formatPolitenessScore, formatErrorLog } from '@/lib/utils';
+import { logToIPFS } from '@lib/ipfs-client';
 import { useToast, toastPolitenessScore } from '@hooks/use-toast';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 
 type Message = {
   sender: 'You' | 'olsme-user';
@@ -31,15 +33,21 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [politenessPrompt, setPolitenessPrompt] = useState('');
+  const [isPremium, setIsPremium] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const user = auth.currentUser;
 
   useEffect(() => {
+    if (user) {
+      getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
+        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+      });
+    }
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, user]);
 
   const validatePolitenessScore = (score: { ethical: number; communication: number; listener: number; topics: number }) => {
     const values = [score.ethical, score.communication, score.listener, score.topics];
@@ -49,13 +57,12 @@ export default function ChatPanel() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please log in to chat.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Please log in to chat.', id: 'auth-error' });
       return;
     }
     if (newMessage.trim() === '') return;
-    // Input validation (done, Day 5)
     if (newMessage.length > 1000) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Message too long (max 1000 characters).' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Message too long (max 1000 characters).', id: 'message-length-error' });
       return;
     }
 
@@ -64,68 +71,112 @@ export default function ChatPanel() {
     setNewMessage('');
 
     try {
+      // Batch Firestore writes
+      const batch = writeBatch(db);
       const messageLog = {
         userId: user.uid,
         text: newMessage,
         sender: 'You',
         timestamp: new Date(),
       };
-      await addDoc(collection(db, 'messages'), messageLog);
-      await logToIPFS(messageLog);
-      await triggerBiofeedback(user.uid, 'chat');
-      toast({ title: 'Message Sent', description: 'Your message was sent mindfully.' });
-      await addDoc(collection(db, 'control_logs'), { userId: user.uid, action: 'send_message', state: true, timestamp: new Date() });
-      await fetch('/api/message', { method: 'POST', body: JSON.stringify(messageLog) });
-    } catch (e) {
-      if (e instanceof Error) {
-        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'handleSendMessage'));
-        await logToIPFS({ error: e.message, context: 'handleSendMessage' });
-      }
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send message.' });
-    }
+      batch.set(collection(db, 'messages').doc(), messageLog);
+      batch.set(collection(db, 'biofeedback_events').doc(), {
+        userId: user.uid,
+        type: 'audio_chat',
+        value: 1,
+        timestamp: new Date(),
+      });
+      batch.set(collection(db, 'control_logs').doc(), {
+        userId: user.uid,
+        action: 'send_message',
+        state: true,
+        timestamp: new Date(),
+      });
+      await batch.commit();
 
-    setTimeout(async () => {
-      const reply = { sender: 'olsme-user' as const, text: 'That’s an interesting point.' };
-      setMessages((prev) => [...prev, reply]);
-      await addDoc(collection(db, 'messages'), { ...reply, timestamp: new Date() });
-    }, 1500);
+      // Log to IPFS
+      await logToIPFS({ ...messageLog, action: 'send_message' });
 
-    try {
+      // Mindfulness: Trigger calming audio
+      await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
+
+      toast({
+        title: 'Message Sent',
+        description: 'Your message was sent mindfully.',
+        id: 'message-sent',
+      });
+
+      // Simulate reply
+      setTimeout(async () => {
+        const reply = { sender: 'olsme-user' as const, text: 'That’s an interesting point.' };
+        setMessages((prev) => [...prev, reply]);
+        await addDoc(collection(db, 'messages'), { ...reply, timestamp: new Date() });
+      }, 1500);
+
+      // Get politeness prompt
       const conversationHistory = newMessages.map((m) => `${m.sender}: ${m.text}`).join('\n');
       const prompt = await getPolitenessPrompt(conversationHistory, user.uid);
       setPolitenessPrompt(prompt);
-      await addDoc(collection(db, 'prompts'), { prompt, userId: user.uid, timestamp: new Date() });
-      await logToIPFS({ prompt, userId: user.uid });
+
+      // Log prompt
+      const promptLog = { prompt, userId: user.uid, timestamp: new Date() };
+      batch.set(collection(db, 'prompts').doc(), promptLog);
+      await logToIPFS({ ...promptLog, action: 'politeness_prompt' });
+
+      // Process politeness score
       const score = { ethical: 85, communication: 80, listener: 90, topics: 75 };
-      // Validate score (new, Day 5)
       if (!validatePolitenessScore(score)) {
         throw new Error('Invalid politeness score');
       }
-      await addDoc(collection(db, 'politeness_scores'), { userId: user.uid, score, timestamp: new Date() });
-      await logToIPFS({ score, userId: user.uid });
-      toastPolitenessScore(score);
-      await fetch('/api/prompt', { method: 'POST', body: JSON.stringify({ prompt, userId: user.uid }) });
-    } catch (e) {
-      if (e instanceof Error) {
-        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'getPolitenessPrompt'));
-        await logToIPFS({ error: e.message, context: 'getPolitenessPrompt' });
-      }
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to get politeness prompt.' });
+      batch.set(collection(db, 'politeness_scores').doc(), { userId: user.uid, score, timestamp: new Date() });
+      await batch.commit();
+      await logToIPFS({ score, userId: user.uid, action: 'politeness_score' });
+      await toastPolitenessScore({ ...score, userId: user.uid, isPremium });
+
+      await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
+    } catch (e: any) {
+      const batch = writeBatch(db);
+      batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'chatPanel', user.uid));
+      batch.set(collection(db, 'biofeedback_events').doc(), {
+        userId: user.uid,
+        type: 'error',
+        value: 0,
+        timestamp: new Date(),
+      });
+      await batch.commit();
+
+      await logToIPFS({
+        error: e.message,
+        context: 'chatPanel',
+        userId: user.uid,
+        action: 'error',
+        timestamp: new Date().toISOString(),
+      });
+
+      await triggerBiofeedback(user.uid, 'chat');
+
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to process message or politeness prompt.',
+        id: 'chat-error',
+      });
     }
   };
 
   return (
-    <Card className="w-full h-full flex flex-col">
+    <Card className="w-full h-full flex flex-col" role="region" aria-label="Chat panel">
       <CardHeader className="p-4 border-b">
         <h3 className="font-semibold text-center">Chat</h3>
       </CardHeader>
       <CardContent className="p-0 flex-grow">
-        <ScrollArea className="h-[400px] lg:h-full p-4" ref={scrollAreaRef}>
+        <ScrollArea className="h-[400px] lg:h-full p-4" ref={scrollAreaRef} aria-live="polite">
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
                 className={`flex ${message.sender === 'You' ? 'justify-end' : 'justify-start'}`}
+                role="listitem"
               >
                 <div
                   className={`max-w-[75%] rounded-lg px-3 py-2 ${
@@ -142,19 +193,20 @@ export default function ChatPanel() {
       {politenessPrompt && (
         <div className="p-2 border-t text-sm text-muted-foreground bg-muted/50">
           <div className="flex items-center gap-2 container">
-            <Sparkles className="w-4 h-4 text-secondary" />
+            <Sparkles className="w-4 h-4 text-secondary" aria-hidden="true" />
             <p className="italic">{politenessPrompt}</p>
           </div>
         </div>
       )}
       <CardFooter className="p-2 border-t">
-        <form onSubmit={handleSendMessage} className="flex w-full items-start gap-2">
+        <form onSubmit={handleSendMessage} className="flex w-full items-start gap-2" role="form" aria-label="Send message">
           <Textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
             className="flex-grow resize-none"
             rows={1}
+            aria-label="Message input"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

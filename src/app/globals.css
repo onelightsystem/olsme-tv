@@ -1,19 +1,18 @@
 /* Path: src/app/globals.css */
-/* Improvements (Sept 28, 2025): */
-/* - Kept Tailwind base/components/utilities, shadcn vars, #FFD700 gold, #F5F5DC beige (done, Day 6). */
-/* - Kept fixes for :host, -webkit-text-size-adjust, -moz-focus-inner (Day 6/15). */
-/* - Added loading-sun animation for wait-time spinners (new, blueprint, Day 4). */
+/* Improvements (Sept 30, 2025): */
+/* - Fixed `-webkit-text-size-adjust` parsing error by moving to `body` selector. */
+/* - Replaced `-moz-focus-inner` with standard `outline` for button focus. */
+/* - Kept Tailwind base/components/utilities, shadcn vars, #FFD700 gold, #F5F5DC beige (Day 6). */
+/* - Kept `.premium-video`, `.hd-stream`, `.animate-premium-pulse`, and `loading-sun` animation (Day 4). */
 /* - Aligns with freemium: Premium users ($4.99) unlock custom themes (Business Plan). */
 /* - Solo Tip: Test with `npm run dev`, inspect #FFD700 buttons, check Firestore for style logs. */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* You can change the background color here. I've set it to a light beige (#F5F5DC). */
-    --background: 60 56% 91%; /* Light Beige */
+    --background: 60 56% 91%; /* Light Beige Approved by OLS */
     --foreground: 0 0% 15%; /* Dark for contrast */
     --card: 60 4% 96%;
     --card-foreground: 0 0% 15%;
@@ -47,6 +46,7 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
     --background: 0 0% 10%;
     --foreground: 60 4% 98%;
@@ -84,19 +84,41 @@
 }
 
 @layer base {
-  :host { all: initial; } /* Fix shadcn warnings */
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
-  html { -webkit-text-size-adjust: 100%; } /* Fix console warnings */
-  button::-moz-focus-inner { border: 0; } /* Firefox compatibility (Day 15) */
+  :host {
+    all: initial; /* Fix shadcn warnings */
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-text-size-adjust: 100%; /* Moved to body selector */
+  }
+  button {
+    outline: none; /* Replace -moz-focus-inner for Firefox compatibility */
+  }
 }
 
 @layer utilities {
   .animate-loading-sun {
     animation: loading-sun 1.5s ease-in-out infinite;
   }
+  .animate-premium-pulse {
+    animation: premium-pulse 2s ease-in-out infinite;
+  }
   @keyframes loading-sun {
     0% { opacity: 0.3; transform: rotate(0deg); }
     100% { opacity: 1; transform: rotate(360deg); }
+  }
+  @keyframes premium-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+  }
+  .premium-video {
+    border: 2px solid #FFD700;
+  }
+  .hd-stream {
+    filter: brightness(1.1) contrast(1.1);
   }
 }

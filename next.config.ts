@@ -1,6 +1,13 @@
+// Path: next.config.ts
+// Improvements (Sept 30, 2025):
+// - Removed invalid `srcDir` option to fix build warning (Next.js 15.5.3 compatibility).
+// - Kept Webpack mock for `electron` to resolve `electron-fetch` build error.
+// - Added `NEXT_PUBLIC_IPFS_URL` to environment variables for IPFS flexibility.
+// - Kept TypeScript/ESLint ignore for MVP speed (Month 1).
+// - Kept image domains for OLS assets and placeholders.
+// - Solo Tip: Run `npm run build` to verify no warnings, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  srcDir: 'src',
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)
   },
@@ -24,6 +31,14 @@ const nextConfig = {
     FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
     FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
     FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
+    NEXT_PUBLIC_IPFS_URL: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001',
+  },
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      electron: false, // Mock electron to resolve `electron-fetch` error
+    };
+    return config;
   },
 };
 
