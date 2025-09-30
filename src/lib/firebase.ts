@@ -13,7 +13,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
-  User as FirebaseUser,
 } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { collection, addDoc, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -36,8 +35,15 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
   throw new Error('Firestore retry limit reached');
 }
 
+type UserData = {
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+};
+
 // Helper to create user document in Firestore
-export const createUserDocument = async (userData: { uid: string; displayName?: string | null; email?: string | null; phoneNumber?: string | null }) => {
+export const createUserDocument = async (userData: UserData) => {
   const userRef = doc(db, 'users', userData.uid);
   const displayName = userData.displayName || userData.phoneNumber || 'Anonymous';
   
@@ -59,7 +65,7 @@ export const createUserDocument = async (userData: { uid: string; displayName?: 
   await withFirestoreRetry(() =>
     setDoc(userRef, serializableUserData, { merge: true }) // Use merge to avoid overwriting existing data if user re-authenticates
   );
-  await logToIPFS({ userId: userData.uid, action: 'createUserDocument' });
+  await logToIPFS(serializableUserData);
 };
 
 // Sign up with Email and Password
@@ -209,3 +215,9 @@ export async function requestKYCVerification() {
     throw error;
   }
 }
+
+// Re-export Firebase functions and instances
+export {
+  updatePolitenessScore,
+  logBiofeedbackEvent,
+};
