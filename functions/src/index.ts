@@ -287,6 +287,6 @@ export const getAllUsers = functions.https.onCall(async (data, context) => {
         return { users };
     } catch (error) {
         functions.logger.error('Error fetching all users:', error);
-        throw new functions.httpshttps.HttpsError('internal', 'Failed to fetch users.');
+        throw new functions.https.HttpsError('internal', 'Failed to fetch users.');
     }
 });
