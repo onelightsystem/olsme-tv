@@ -25,6 +25,14 @@ interface PolitenessScore {
   topics: number;
 }
 
+/**
+ * Formats a politeness score and returns an object with the average, badge, and message.
+ *
+ * @param {PolitenessScore} score - The politeness score object.
+ * @param {string} [userId] - Optional user ID. If provided, checks if the user is premium and appends a premium message.
+ *   If `userId` is undefined, the premium check is skipped and the message does not include premium details.
+ * @returns {Promise<{ average: number, badge: string, message: string }>} The formatted politeness score.
+ */
 export async function formatPolitenessScore(score: PolitenessScore, userId?: string) {
   const average = (score.ethical + score.communication + score.listener + score.topics) / 4;
   const badge = average >= 80 ? 'Gold' : average >= 60 ? 'Silver' : 'Bronze';
