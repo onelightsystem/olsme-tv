@@ -19,7 +19,7 @@ import { Send, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from '@components/ui/card';
 import { getPolitenessPrompt } from '@ai/actions';
 import { auth, db } from '@lib/firebase/config';
-import { triggerBiofeedback, formatPolitenessScore, formatErrorLog } from '@lib/utils';
+import { triggerBiofeedback, formatPolitenessScore, formatErrorLog, generateCorrelationId } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { useToast, toastPolitenessScore } from '@hooks/use-toast';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
@@ -65,102 +65,87 @@ export default function ChatPanel() {
       toast({ variant: 'destructive', title: 'Error', description: 'Message too long (max 1000 characters).', id: 'message-length-error' });
       return;
     }
-
+    const correlationId = generateCorrelationId();
     const newMessages: Message[] = [...messages, { sender: 'You', text: newMessage }];
     setMessages(newMessages);
     setNewMessage('');
-
     try {
-      // Batch Firestore writes
       const batch = writeBatch(db);
       const messageLog = {
         userId: user.uid,
         text: newMessage,
         sender: 'You',
-        timestamp: new Date(),
+        level: "info",
+        correlationId,
+        mindfulness: "message_sent",
+        timestamp: new Date()
       };
-      batch.set(collection(db, 'messages').doc(), messageLog);
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'messages')), messageLog);
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'audio_chat',
         value: 1,
-        timestamp: new Date(),
+        correlationId,
+        timestamp: new Date()
       });
-      batch.set(collection(db, 'control_logs').doc(), {
+      batch.set(doc(collection(db, 'control_logs')), {
         userId: user.uid,
         action: 'send_message',
         state: true,
-        timestamp: new Date(),
-      });
-      await batch.commit();
-
-      // Log to IPFS
-      await logToIPFS({ ...messageLog, action: 'send_message' });
-
-      // Mindfulness: Trigger calming audio
-      await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
-
-      toast({
-        title: 'Message Sent',
-        description: 'Your message was sent mindfully.',
-        id: 'message-sent',
+        correlationId,
+        timestamp: new Date()
       });
 
-      // Simulate reply
-      setTimeout(async () => {
-        const reply = { sender: 'olsme-user' as const, text: 'That’s an interesting point.' };
-        setMessages((prev) => [...prev, reply]);
-        await addDoc(collection(db, 'messages'), { ...reply, timestamp: new Date() });
-      }, 1500);
-
-      // Get politeness prompt
       const conversationHistory = newMessages.map((m) => `${m.sender}: ${m.text}`).join('\n');
       const prompt = await getPolitenessPrompt(conversationHistory, user.uid);
       setPolitenessPrompt(prompt);
+      batch.set(doc(collection(db, 'prompts')), { prompt, userId: user.uid, correlationId, timestamp: new Date() });
 
-      // Log prompt
-      const promptLog = { prompt, userId: user.uid, timestamp: new Date() };
-      batch.set(collection(db, 'prompts').doc(), promptLog);
-      await logToIPFS({ ...promptLog, action: 'politeness_prompt' });
-
-      // Process politeness score
       const score = { ethical: 85, communication: 80, listener: 90, topics: 75 };
       if (!validatePolitenessScore(score)) {
         throw new Error('Invalid politeness score');
       }
-      batch.set(collection(db, 'politeness_scores').doc(), { userId: user.uid, score, timestamp: new Date() });
-      await batch.commit();
-      await logToIPFS({ score, userId: user.uid, action: 'politeness_score' });
-      await toastPolitenessScore({ ...score, userId: user.uid, isPremium });
+      batch.set(doc(collection(db, 'politeness_scores')), { userId: user.uid, score, correlationId, timestamp: new Date() });
 
+      await batch.commit();
+
+      await logToIPFS({ ...messageLog, action: 'send_message' });
       await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
-    } catch (e: any) {
+      toast({ title: 'Message Sent', description: 'Your message was sent mindfully.', id: 'message-sent' });
+
+      setTimeout(async () => {
+        const reply = { sender: 'olsme-user' as const, text: 'That’s an interesting point.' };
+        setMessages((prev) => [...prev, reply]);
+        await addDoc(collection(db, 'messages'), { ...reply, correlationId, timestamp: new Date() });
+      }, 1500);
+
+      await logToIPFS({ prompt, userId: user.uid, action: 'politeness_prompt', correlationId });
+      await logToIPFS({ score, userId: user.uid, action: 'politeness_score', correlationId });
+      await toastPolitenessScore({ ...score, userId: user.uid, isPremium });
+      await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
+    } catch (e: unknown) {
       const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'chatPanel', user.uid));
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'chatPanel', user.uid, correlationId));
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'error',
         value: 0,
-        timestamp: new Date(),
+        correlationId,
+        timestamp: new Date()
       });
       await batch.commit();
 
+      const errorMessage = e instanceof Error ? e.message : String(e);
       await logToIPFS({
-        error: e.message,
+        error: errorMessage,
         context: 'chatPanel',
         userId: user.uid,
         action: 'error',
-        timestamp: new Date().toISOString(),
+        correlationId,
+        timestamp: new Date().toISOString()
       });
-
       await triggerBiofeedback(user.uid, 'chat');
-
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to process message or politeness prompt.',
-        id: 'chat-error',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to process message or politeness prompt.', id: 'chat-error' });
     }
   };
 

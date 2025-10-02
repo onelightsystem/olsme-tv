@@ -5,11 +5,11 @@
 // - Aligns with blueprint: Prepares AI Politeness Monitor for Cloud Functions (Day 5).
 // - Solo Tip: Test with `npm run genkit:dev`, check Firestore `logs`, IPFS CID.
 
-import { config } from 'dotenv';
-import { db } from '@lib/firebase/config';
-import { formatErrorLog } from '@lib/utils';
-import { logToIPFS } from '@lib/utils';
-import { collection, addDoc } from 'firebase/firestore';
+import {config} from 'dotenv';
+import {db} from '@lib/firebase/config';
+import {formatErrorLog} from '@lib/utils';
+import {logToIPFS} from '@lib/utils';
+import {collection, addDoc} from 'firebase/firestore';
 import '@ai/flows/generate-politeness-prompt';
 
 config();
@@ -17,7 +17,7 @@ config();
 process.on('unhandledRejection', async (error) => {
   if (error instanceof Error) {
     await addDoc(collection(db, 'logs'), formatErrorLog(error, 'genkitDev'));
-    await logToIPFS({ error: error.message, context: 'genkitDev' });
+    await logToIPFS({error: error.message, context: 'genkitDev'});
   }
   console.error('Unhandled rejection in Genkit dev:', error);
 });

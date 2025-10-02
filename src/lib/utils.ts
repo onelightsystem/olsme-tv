@@ -8,14 +8,18 @@
 // - Aligns with blueprint: OLS biofeedback (Red Sea waves) and AI politeness badges.
 // - Solo Tip: Test with `npm run dev`, trigger biofeedback via /search, check Firestore `biofeedback_events`.
 'use client';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { logBiofeedbackEvent, db, auth } from '@lib/firebase/config';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import {clsx, type ClassValue} from 'clsx';
+import {twMerge} from 'tailwind-merge';
+import {logBiofeedbackEvent, db} from '@lib/firebase/config';
+import {collection, addDoc, doc, getDoc} from 'firebase/firestore';
+import {v4 as uuidv4} from 'uuid';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function generateCorrelationId(): string {
+  return uuidv4();
 }
 
 interface PolitenessScore {
@@ -47,9 +51,10 @@ export async function formatPolitenessScore(score: PolitenessScore, userId?: str
       if (isPremium) {
         message += ' - Unlock detailed insights with your Premium subscription!';
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
       await addDoc(collection(db, 'logs'), {
-        error: e.message,
+        error: errorMessage,
         context: 'formatPolitenessScore',
         userId: userId || 'unknown',
         timestamp: new Date().toISOString(),
@@ -75,9 +80,10 @@ async function validateBiofeedbackEvent(userId: string, event: { type: string; v
     if (typeof event.value !== 'number' || event.value < 0 || event.value > 1) {
       throw new Error('Invalid biofeedback event value');
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
     await addDoc(collection(db, 'logs'), {
-      error: e.message,
+      error: errorMessage,
       context: 'validateBiofeedbackEvent',
       userId,
       timestamp: new Date().toISOString(),
@@ -96,13 +102,13 @@ export async function triggerBiofeedback(
     const userDoc = await getDoc(doc(db, 'users', userId));
     const soundEnabled = userDoc.exists() ? userDoc.data()?.settings?.soundEnabled !== false : true;
     if (!soundEnabled) {
-      return { success: true, message: 'Biofeedback skipped: User sound disabled' };
+      return {success: true, message: 'Biofeedback skipped: User sound disabled'};
     }
     // Check for premium user custom audio
     const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
     const finalAudioUrl = isPremium && userDoc.data()?.customAudioUrl ? userDoc.data()?.customAudioUrl : audioUrl;
     // Validate audio URL
-    const response = await fetch(finalAudioUrl, { method: 'HEAD' });
+    const response = await fetch(finalAudioUrl, {method: 'HEAD'});
     if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
       throw new Error('Invalid audio URL');
     }
@@ -121,30 +127,44 @@ export async function triggerBiofeedback(
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       }
     }
-    const event = { type: `audio_${type}`, value: 1 };
+    const event = {type: `audio_${type}`, value: 1};
     await validateBiofeedbackEvent(userId, event);
     await logBiofeedbackEvent(userId, event);
-    return { success: true, message: `Biofeedback triggered: ${isPremium ? 'Custom audio' : 'Red Sea waves'}` };
-  } catch (e: any) {
-    const errorEvent = { type: 'error', value: 0 };
+    return {success: true, message: `Biofeedback triggered: ${isPremium ? 'Custom audio' : 'Red Sea waves'}`};
+  } catch (e: unknown) {
+    const errorEvent = {type: 'error', value: 0};
     await validateBiofeedbackEvent(userId, errorEvent);
     await logBiofeedbackEvent(userId, errorEvent);
+    const errorMessage = e instanceof Error ? e.message : String(e);
     await addDoc(collection(db, 'logs'), {
-      error: e.message,
+      error: errorMessage,
       context: 'triggerBiofeedback',
       userId,
       timestamp: new Date().toISOString(),
     });
-    throw new Error(`Biofeedback failed: ${e.message}`);
+    throw new Error(`Biofeedback failed: ${errorMessage}`);
   }
 }
 
-export function formatErrorLog(error: any, context: string, userId: string = 'unknown') {
+export function formatErrorLog(error: unknown, context: string, userId: string, correlationId: string) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
   return {
-    error: error.message || String(error),
-    timestamp: new Date().toISOString(),
-    context,
-    stack: error.stack || 'No stack trace',
     userId,
+    context,
+    error: errorMessage,
+    level: "error",
+    correlationId,
+    timestamp: new Date()
+  };
+}
+
+export function formatInfoLog(action: string, userId: string, correlationId: string, mindfulness?: string) {
+  return {
+    userId,
+    action,
+    level: "info",
+    correlationId,
+    mindfulness,
+    timestamp: new Date()
   };
 }

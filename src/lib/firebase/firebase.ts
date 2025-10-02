@@ -19,10 +19,10 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { collection, addDoc, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { formatErrorLog } from '@lib/utils';
-import { auth, db } from './config';
+import {getFunctions, httpsCallable} from 'firebase/functions';
+import {collection, addDoc, updateDoc, doc, setDoc, serverTimestamp} from 'firebase/firestore';
+import {formatErrorLog, generateCorrelationId} from '@lib/utils';
+import {auth, db} from './config';
 
 // Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
@@ -58,107 +58,112 @@ export const createUserDocument = async (userData: UserData) => {
     phoneNumber: userData.phoneNumber || null,
     createdAt: serverTimestamp(),
     package: 'free', // Default to free package
-    politenessScore: { ethical: 75, communication: 75, listener: 75, topics: 75 }, // Start with a neutral score
+    politenessScore: {ethical: 75, communication: 75, listener: 75, topics: 75}, // Start with a neutral score
     verificationLevel: 'level1', // Start at level 1
     olsPoints: 0, // Start with 0 points
     location: '',
     age: null,
   };
   await withFirestoreRetry(() =>
-    setDoc(userRef, serializableUserData, { merge: true }) // Use merge to avoid overwriting existing data
+    setDoc(userRef, serializableUserData, {merge: true}) // Use merge to avoid overwriting existing data
   );
-  const { logToIPFS } = await import('@lib/ipfs-client');
+  const {logToIPFS} = await import('@lib/ipfs-client');
   await logToIPFS(serializableUserData);
 };
 
 // Sign up with Email and Password
 export async function signUpWithEmail(email: string, password: string, displayName: string) {
+  const correlationId = generateCorrelationId();
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
     const user = result.user;
-    await updateProfile(user, { displayName });
-    await createUserDocument({ uid: user.uid, displayName, email: user.email });
+    await updateProfile(user, {displayName});
+    await createUserDocument({uid: user.uid, displayName, email: user.email});
     return user;
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail', '', correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'signUpWithEmail' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'signUpWithEmail', correlationId});
     throw e;
   }
 }
 
 // Sign in with Email and Password
 export async function signInWithEmail(email: string, password: string) {
+  const correlationId = generateCorrelationId();
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ userId: result.user.uid, action: 'signInWithEmail' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({userId: result.user.uid, action: 'signInWithEmail', correlationId});
     return result.user;
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail', '', correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'signInWithEmail' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'signInWithEmail', correlationId});
     throw e;
   }
 }
 
 // X.com (Twitter) OAuth for User Authentication
 export async function signInWithX() {
+  const correlationId = generateCorrelationId();
   try {
     const result = await signInWithPopup(auth, new TwitterAuthProvider());
     const user = result.user;
-    await createUserDocument({ uid: user.uid, displayName: user.displayName, email: user.email });
+    await createUserDocument({uid: user.uid, displayName: user.displayName, email: user.email});
     return user;
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX', '', correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'signInWithX' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'signInWithX', correlationId});
     throw e;
   }
 }
 
 // Phone OTP Authentication
 export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier): Promise<ConfirmationResult> {
+  const correlationId = generateCorrelationId();
   try {
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({action: 'signInWithPhone_sent', phoneNumber, correlationId});
     return confirmationResult;
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone', '', correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'signInWithPhone' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'signInWithPhone', correlationId});
     throw e;
   }
 }
 
 // Update Politeness Score in Firestore and trigger claim update
 export async function updatePolitenessScore(userId: string, score: { ethical: number; communication: number; listener: number; topics: number }) {
+  const correlationId = generateCorrelationId();
   try {
     const userRef = doc(db, 'users', userId);
-    await withFirestoreRetry(() => updateDoc(userRef, { politenessScore: score }));
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ userId, score, action: 'updatePolitenessScore' });
+    await withFirestoreRetry(() => updateDoc(userRef, {politenessScore: score}));
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({userId, score, action: 'updatePolitenessScore', correlationId});
     // Trigger the Cloud Function to update custom claims
     const functions = getFunctions();
     const setPolitenessClaim = httpsCallable(functions, 'setPolitenessClaim');
-    await setPolitenessClaim({ uid: userId, score });
+    await setPolitenessClaim({uid: userId, score});
     // Force refresh of the token to get the new claims on the client
     const user = auth.currentUser;
     if (user) {
@@ -167,36 +172,38 @@ export async function updatePolitenessScore(userId: string, score: { ethical: nu
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore', userId, correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'updatePolitenessScore' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'updatePolitenessScore', correlationId});
     throw e;
   }
 }
 
 // Log biofeedback event to Firestore
 export async function logBiofeedbackEvent(userId: string, event: { type: string; value: number; cid?: string }) {
+  const correlationId = generateCorrelationId();
   try {
     const logData = {
       userId,
       type: event.type,
       value: event.value,
       cid: event.cid || null,
+      correlationId,
       timestamp: new Date(),
     };
     await withFirestoreRetry(() => addDoc(collection(db, 'biofeedback'), logData));
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS(logData);
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({...logData, action: 'logBiofeedbackEvent'});
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent'));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent', userId, correlationId));
       }
     });
-    const { logToIPFS } = await import('@lib/ipfs-client');
-    await logToIPFS({ error: (e as Error).message, context: 'logBiofeedbackEvent' });
+    const {logToIPFS} = await import('@lib/ipfs-client');
+    await logToIPFS({error: (e as Error).message, context: 'logBiofeedbackEvent', correlationId});
     throw e;
   }
 }
@@ -204,6 +211,7 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
 // Request KYC verification
 export async function requestKYCVerification() {
   if (!auth.currentUser) throw new Error("User not authenticated");
+  const correlationId = generateCorrelationId();
   try {
     const functions = getFunctions();
     const sendAdminEmail = httpsCallable(functions, 'sendAdminEmail');
@@ -213,16 +221,16 @@ export async function requestKYCVerification() {
       email: auth.currentUser.email,
     });
     if (response.data.success) {
-      const { logToIPFS } = await import('@lib/ipfs-client');
-      await logToIPFS({ userId: auth.currentUser.uid, action: 'request_kyc' });
+      const {logToIPFS} = await import('@lib/ipfs-client');
+      await logToIPFS({userId: auth.currentUser.uid, action: 'request_kyc', correlationId});
     } else {
       throw new Error(response.data.message || 'Failed to send verification request.');
     }
   } catch (error) {
     if (error instanceof Error) {
-      await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification'));
-      const { logToIPFS } = await import('@lib/ipfs-client');
-      await logToIPFS({ error: error.message, context: 'requestKYCVerification' });
+      await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification', auth.currentUser.uid, correlationId));
+      const {logToIPFS} = await import('@lib/ipfs-client');
+      await logToIPFS({error: error.message, context: 'requestKYCVerification', userId: auth.currentUser.uid, correlationId});
     }
     throw error;
   }

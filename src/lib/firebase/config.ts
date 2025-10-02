@@ -5,11 +5,11 @@
 // - Aligns with blueprint: Centralized Firebase setup for 100K users (Business Plan).
 // - Solo Tip: Test with `npm run dev`, trigger auth/biofeedback, check Firestore `biofeedback`/`logs`.
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
+import {initializeApp, getApps, getApp} from 'firebase/app';
+import {getAuth} from 'firebase/auth';
+import {getFirestore} from 'firebase/firestore';
+import {getStorage} from 'firebase/storage';
+import {getAnalytics, isSupported, Analytics} from 'firebase/analytics';
 import { 
   signInWithX, 
   signInWithPhone, 
@@ -44,7 +44,7 @@ if (typeof window !== 'undefined') {
     }
   });
 }
-export { analytics };
+export {analytics};
 
 // Re-export Firebase functions
 export { 
