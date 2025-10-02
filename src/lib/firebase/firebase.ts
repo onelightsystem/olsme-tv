@@ -83,7 +83,7 @@ export async function signUpWithEmail(email: string, password: string, displayNa
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail', '', correlationId));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail', 'unknown', correlationId));
       }
     });
     const {logToIPFS} = await import('@lib/ipfs-client');
