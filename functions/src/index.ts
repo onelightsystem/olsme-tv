@@ -1,5 +1,6 @@
 // Path: functions/src/index.ts
 // Improvements (Oct 2, 2025):
+// - Added `rateGuest` function to store user ratings in Firestore.
 // - Added `setPolitenessClaim` Cloud Function to set custom claims based on politeness and verification.
 // - This function is callable from the client after a score update.
 // - It calculates the politeness level (Bronze, Silver, Gold) and sets it as a custom claim.
@@ -161,10 +162,6 @@ export const searchUsers = functions.https.onCall(async (data, context) => {
     const { query, verificationLevel } = data;
     const normalizedQuery = (query || '').trim().toLowerCase();
 
-    if (!normalizedQuery && !verificationLevel) {
-        return { users: [] };
-    }
-
     let userQuery: admin.firestore.Query = db.collection('users');
 
     if (normalizedQuery) {
@@ -177,12 +174,22 @@ export const searchUsers = functions.https.onCall(async (data, context) => {
         userQuery = userQuery.where('verificationLevel', '==', verificationLevel);
     }
 
+    // if no filters are applied, return an empty list or a random subset
+    if (!normalizedQuery && !verificationLevel) {
+        // for now, returning a few users for guest list.
+        // in a real app, you might want more sophisticated logic
+        userQuery = userQuery.limit(10);
+    }
+
+
     try {
         const snapshot = await userQuery.limit(20).get();
-        const users = snapshot.docs.map(doc => {
-            const { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel } = doc.data();
-            return { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel };
-        });
+        const users = snapshot.docs
+            .map(doc => {
+                const { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel } = doc.data();
+                return { uid, displayName, package: userPackage, verificationLevel: userVerificationLevel };
+            })
+            .filter(user => user.uid !== context.auth?.uid); // Exclude the current user
 
         await db.collection('logs').add({
             userId: context.auth.uid,
@@ -288,5 +295,26 @@ export const getAllUsers = functions.https.onCall(async (data, context) => {
     } catch (error) {
         functions.logger.error('Error fetching all users:', error);
         throw new functions.https.HttpsError('internal', 'Failed to fetch users.');
+    }
+});
+
+export const rateGuest = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const { guestId, rating } = data;
+    if (!guestId || !['good', 'bad'].includes(rating)) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid guest ID or rating.');
+    }
+    try {
+      await admin.firestore().collection('ratings').add({
+        userId: context.auth.uid,
+        guestId,
+        rating,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error: any) {
+      throw new functions.https.HttpsError('internal', error.message);
     }
 });
