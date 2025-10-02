@@ -1,66 +1,99 @@
 // Path: src/lib/utils.ts
-// Improvements (Sept 29, 2025):
-// - Kept `cn` for Tailwind class merging (done, shadcn) to style “Let’s Chat” button with #FFD700 gold (blueprint).
-// - Kept `formatPolitenessScore` (done, Day 5) for AI Politeness Monitor badges (Gold/Silver/Bronze).
-// - Kept `triggerBiofeedback` (done, Day 11) to play Red Sea audio prompts during chat waits, tied to OLS biofeedback.
-// - Kept `formatErrorLog` (done, Day 2) to standardize Firestore error logs for auth/import issues, enhancing solo debugging.
-// - Kept `logToIPFS` (done, Day 4) for decentralized politeness score logging, countering elite censorship (IPFS stub).
-// - Fixed import: Changed `logBiofeedbackEvent` from `@lib/firebase/config` to `@lib/firebase` (new, resolves console error).
-// - Added retry logic for biofeedback events (new, Day 11).
-// - Kept validation for IPFS logging and biofeedback events (done, Day 4/11).
-// - Aligns with freemium: Premium users ($4.99) unlock detailed score messages and custom audio prompts (Business Plan).
-// - Solo Tip: Test with `npm run dev`, log errors/biofeedback in Firestore (db.collection('logs')), verify IPFS mocks.
-
+// Improvements (Sept 30, 2025):
+// - Enhanced `formatPolitenessScore` to include premium user messages (freemium model).
+// - Added premium user check in `triggerBiofeedback` for custom audio URLs.
+// - Added Firestore logging for validation failures in `validateBiofeedbackEvent`.
+// - Added accessibility option to skip audio for users with sound disabled.
+// - Aligns with blueprint: OLS biofeedback (Red Sea waves) and AI politeness badges.
+// - Solo Tip: Test with `npm run dev`, trigger biofeedback via /search, check Firestore `biofeedback_events`.
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { logBiofeedbackEvent } from '@/lib/firebase';
-import { db } from '@/lib/firebase/config';
-import { collection, addDoc } from 'firebase/firestore';
+import { logBiofeedbackEvent, db, auth } from '@/lib/firebase/config';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
-
-// Merge classes with Tailwind support (done, shadcn)
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Format politeness score for UI (done, Day 5)
-export function formatPolitenessScore(score: { ethical: number; communication: number; listener: number; topics: number }) {
+interface PolitenessScore {
+  ethical: number;
+  communication: number;
+  listener: number;
+  topics: number;
+}
+
+export async function formatPolitenessScore(score: PolitenessScore, userId: string) {
   const average = (score.ethical + score.communication + score.listener + score.topics) / 4;
+  const badge = average >= 80 ? 'Gold' : average >= 60 ? 'Silver' : 'Bronze';
+  let message = average >= 80 ? 'Radiant Light' : average >= 60 ? 'Growing Glow' : 'Seeking Truth';
+
+  // Check for premium user
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
+  if (isPremium) {
+    message += ' - Unlock detailed insights with your Premium subscription!';
+  }
+
   return {
     average: Math.round(average),
-    badge: average >= 80 ? 'Gold' : average >= 60 ? 'Silver' : 'Bronze',
-    message: average >= 80 ? 'Radiant Light' : average >= 60 ? 'Growing Glow' : 'Seeking Truth',
+    badge,
+    message,
   };
 }
 
-// Validate biofeedback event (done, Day 11)
-function validateBiofeedbackEvent(userId: string, event: { type: string; value: number; cid?: string }) {
-  if (!userId || typeof userId !== 'string') {
-    throw new Error('Invalid user ID for biofeedback event');
-  }
-  if (!event.type || typeof event.type !== 'string' || !['audio_wait', 'audio_chat', 'error', 'ipfs_log', 'ipfs_error'].includes(event.type)) {
-    throw new Error('Invalid biofeedback event type');
-  }
-  if (typeof event.value !== 'number' || event.value < 0 || event.value > 1) {
-    throw new Error('Invalid biofeedback event value');
+async function validateBiofeedbackEvent(userId: string, event: { type: string; value: number; cid?: string }) {
+  try {
+    if (!userId || typeof userId !== 'string') {
+      throw new Error('Invalid user ID for biofeedback event');
+    }
+    if (!event.type || typeof event.type !== 'string' || !['audio_wait', 'audio_chat', 'error', 'ipfs_log', 'ipfs_error'].includes(event.type)) {
+      throw new Error('Invalid biofeedback event type');
+    }
+    if (typeof event.value !== 'number' || event.value < 0 || event.value > 1) {
+      throw new Error('Invalid biofeedback event value');
+    }
+  } catch (e: any) {
+    await addDoc(collection(db, 'logs'), {
+      error: e.message,
+      context: 'validateBiofeedbackEvent',
+      userId,
+      timestamp: new Date().toISOString(),
+    });
+    throw e;
   }
 }
 
-// Trigger biofeedback audio prompt (done, Day 11)
-export async function triggerBiofeedback(userId: string, type: 'wait' | 'chat', audioUrl: string = 'https://olsme.com/assets/red-sea-waves.mp3') {
+export async function triggerBiofeedback(
+  userId: string,
+  type: 'wait' | 'chat',
+  audioUrl: string = 'https://olsme.com/assets/red-sea-waves.mp3'
+) {
   try {
-    // Validate audio URL (done, Day 11)
-    const response = await fetch(audioUrl, { method: 'HEAD' });
+    // Check user preferences for audio
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const soundEnabled = userDoc.exists() ? userDoc.data()?.settings?.soundEnabled !== false : true;
+    if (!soundEnabled) {
+      return { success: true, message: 'Biofeedback skipped: User sound disabled' };
+    }
+
+    // Check for premium user custom audio
+    const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
+    const finalAudioUrl = isPremium && userDoc.data()?.customAudioUrl ? userDoc.data()?.customAudioUrl : audioUrl;
+
+    // Validate audio URL
+    const response = await fetch(finalAudioUrl, { method: 'HEAD' });
     if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
       throw new Error('Invalid audio URL');
     }
-    // Retry logic for audio playback (new, Day 11)
+
+    // Retry logic for audio playback
     let attempts = 0;
     const maxAttempts = 3;
     let audio: HTMLAudioElement | null = null;
     while (attempts < maxAttempts) {
       try {
-        audio = new Audio(audioUrl);
+        audio = new Audio(finalAudioUrl);
         await audio.play();
         break;
       } catch (e) {
@@ -69,50 +102,31 @@ export async function triggerBiofeedback(userId: string, type: 'wait' | 'chat', 
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       }
     }
+
     const event = { type: `audio_${type}`, value: 1 };
-    validateBiofeedbackEvent(userId, event);
+    await validateBiofeedbackEvent(userId, event);
     await logBiofeedbackEvent(userId, event);
-    return { success: true, message: 'Biofeedback triggered: Red Sea waves' };
+    return { success: true, message: `Biofeedback triggered: ${isPremium ? 'Custom audio' : 'Red Sea waves'}` };
   } catch (e: any) {
     const errorEvent = { type: 'error', value: 0 };
-    validateBiofeedbackEvent(userId, errorEvent);
+    await validateBiofeedbackEvent(userId, errorEvent);
     await logBiofeedbackEvent(userId, errorEvent);
+    await addDoc(collection(db, 'logs'), {
+      error: e.message,
+      context: 'triggerBiofeedback',
+      userId,
+      timestamp: new Date().toISOString(),
+    });
     throw new Error(`Biofeedback failed: ${e.message}`);
   }
 }
 
-// Format error for Firestore logging (done, Day 2)
-export function formatErrorLog(error: any, context: string) {
+export function formatErrorLog(error: any, context: string, userId: string = 'unknown') {
   return {
     error: error.message || String(error),
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
     context,
     stack: error.stack || 'No stack trace',
+    userId,
   };
-}
-
-// Log data to IPFS for decentralization (done, Day 4)
-export async function logToIPFS(data: any) {
-  try {
-    // Validate data (done, Day 4)
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid IPFS data');
-    }
-    const { create } = await import('ipfs-http-client');
-    const ipfs = create({ url: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001' });
-    const result = await ipfs.add(JSON.stringify(data));
-    const cid = result.cid.toString();
-    const event = { type: 'ipfs_log', value: 1, cid };
-    validateBiofeedbackEvent('system', event);
-    await logBiofeedbackEvent('system', event);
-    return cid;
-  } catch (e: any) {
-    const errorEvent = { type: 'ipfs_error', value: 0 };
-    validateBiofeedbackEvent('system', errorEvent);
-    await logBiofeedbackEvent('system', errorEvent);
-    // Log the error to Firestore as well for easier debugging
-    await addDoc(collection(db, 'logs'), formatErrorLog(e, 'logToIPFS'));
-    console.error(`IPFS logging failed: ${e.message}`);
-    // We don't re-throw the error to avoid crashing the app if IPFS is down.
-  }
 }

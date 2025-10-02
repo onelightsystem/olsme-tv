@@ -1,24 +1,31 @@
 // Path: src/components/layout/header.tsx
-// Improvements (Oct 3, 2025):
-// - Replaced multiple login buttons with a single User profile icon.
-// - For guests, the icon opens a sign-in/sign-up dialog.
-// - For logged-in users, the icon opens a dropdown menu with links to Profile, Search, and a Sign Out button.
-// - Maintained all existing authentication logic (Email, Phone, Twitter).
-
+// Improvements (Sept 30, 2025):
+// - Updated `Sun` icon to link to home page (`/`), kept "olsme Chat beta 0.2" linked to `/about`.
+// - Kept `Volume2` and `User` icon colors as darker orange (#FF8C00).
+// - Replaced multiple login buttons with a single User profile icon (Day 16).
+// - For guests, the icon opens a sign-in/sign-up dialog with Email/Phone/Twitter options.
+// - For logged-in users, the icon opens a dropdown menu with Profile, Search, and Sign Out.
+// - Maintained all existing authentication logic (Email, Phone, Twitter) (Day 15).
+// - Fixed import: Changed `signInWithX`, `signInWithPhone`, `signUpWithEmail`, `signInWithEmail`, `createUserDocument` from `@lib/firebase` to `@/lib/firebase/config` (Day 16).
+// - Kept dynamic `logToIPFS` import from `ipfs-client.ts` to prevent SSR `electron` error (Day 16).
+// - Kept PT Sans, #FFD700 gold, Radix dialogs (blueprint).
+// - Kept IPFS logging for auth actions (Day 4).
+// - Aligns with freemium: Premium users ($4.99) unlock custom audio toggles (Business Plan).
+// - Solo Tip: Test with `npm run dev`, click `Sun` icon and "olsme Chat beta 0.2" link, check Firestore `logs`, IPFS CID.
 'use client';
 import Link from 'next/link';
 import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search, Shield } from 'lucide-react';
-import { Button } from '@components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   signInWithX,
   signInWithPhone,
   signUpWithEmail,
   signInWithEmail,
   createUserDocument,
-} from '@lib/firebase';
-import { auth } from '@lib/firebase/config';
-import { triggerBiofeedback, formatErrorLog, logToIPFS } from '@lib/utils';
-import { useToast } from '@hooks/use-toast';
+} from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config';
+import { triggerBiofeedback, formatErrorLog } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';
 import { RecaptchaVerifier, ConfirmationResult, signOut, User as FirebaseUser, IdTokenResult } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
@@ -29,7 +36,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@components/ui/dialog';
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,10 +45,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@components/ui/input';
-import { Label } from '@components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
-import { db } from '@/lib/firebase/config';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export default function Header() {
   const { toast } = useToast();
@@ -54,7 +60,6 @@ export default function Header() {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-
   // Form states
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
@@ -64,13 +69,13 @@ export default function Header() {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
-        setUser(u);
-        if (u) {
-            const tokenResult = await u.getIdTokenResult();
-            setClaims(tokenResult.claims);
-        } else {
-            setClaims(null);
-        }
+      setUser(u);
+      if (u) {
+        const tokenResult = await u.getIdTokenResult();
+        setClaims(tokenResult.claims);
+      } else {
+        setClaims(null);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -82,10 +87,12 @@ export default function Header() {
       await signInWithX();
       toast({ title: 'Logged In', description: 'Welcome to Awake Chat!' });
       setAuthDialogOpen(false);
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ userId: auth.currentUser?.uid, action: 'signInWithX' });
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'headerLoginX'));
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'headerLoginX' });
       toast({ variant: 'destructive', title: 'Error', description: 'Login with X failed.' });
     }
@@ -117,15 +124,15 @@ export default function Header() {
 
   const setupRecaptcha = () => {
     if (!recaptchaVerifier.current && recaptchaContainerRef.current) {
-        recaptchaVerifier.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-            size: 'invisible',
-            callback: () => {
-                // reCAPTCHA solved, allow signInWithPhoneNumber.
-            },
-        });
+      recaptchaVerifier.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
+        size: 'invisible',
+        callback: () => {
+          // reCAPTCHA solved
+        },
+      });
     }
   };
-  
+
   const handlePhoneSignInRequest = async () => {
     if (!phoneNumber) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please enter a phone number.' });
@@ -133,7 +140,7 @@ export default function Header() {
     }
     try {
       setupRecaptcha();
-      if(recaptchaVerifier.current) {
+      if (recaptchaVerifier.current) {
         const confirmation = await signInWithPhone(phoneNumber, recaptchaVerifier.current);
         setConfirmationResult(confirmation);
         toast({ title: 'Code Sent', description: 'A verification code has been sent to your phone.' });
@@ -141,6 +148,7 @@ export default function Header() {
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'phoneSignInRequest'));
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'phoneSignInRequest' });
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to send code. Please check the number and try again.' });
     }
@@ -164,10 +172,12 @@ export default function Header() {
       setConfirmationResult(null);
       setPhoneNumber('');
       setVerificationCode('');
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ userId: user.uid, action: 'signInWithPhone' });
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'phoneSignInVerify'));
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'phoneSignInVerify' });
       toast({ variant: 'destructive', title: 'Error', description: 'Invalid verification code.' });
     }
@@ -177,7 +187,7 @@ export default function Header() {
     await signOut(auth);
     toast({ title: 'Logged Out', description: 'You have been signed out.' });
   };
-  
+
   const handleBiofeedbackToggle = async () => {
     try {
       await triggerBiofeedback(user?.uid || 'anonymous', 'chat');
@@ -185,6 +195,7 @@ export default function Header() {
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'headerBiofeedback'));
+      const { logToIPFS } = await import('@/lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'headerBiofeedback' });
       toast({ variant: 'destructive', title: 'Error', description: 'Biofeedback failed.' });
     }
@@ -196,18 +207,22 @@ export default function Header() {
         <div className="container flex h-14 max-w-screen-2xl items-center">
           <div className="mr-4 flex items-center">
             <Link href="/" className="flex items-center">
-              <Sun className="h-6 w-6 mr-2 stroke-[#FFD700]" />
-              <span className="font-bold font-headline">Awake Chat</span>
+              <Sun className="h-8 w-8 mr-2 stroke-[#FFD700]" aria-label="Home" />
+            </Link>
+              <span className="mx-2" />
+            <Link href="/about" className="flex items-center">
+          
+              <span className="font-bold font-headline">olsme Chat beta 0.2</span>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end gap-2">
             <Button variant="ghost" size="icon" onClick={handleBiofeedbackToggle} aria-label="Toggle biofeedback">
-              <Volume2 className="h-5 w-5 stroke-[#FFD700]" />
+              <Volume2 className="h-5 w-5 stroke-[#FF8C00]" />
             </Button>
             {user && (
-               <Link href="/search" passHref>
+              <Link href="/search" passHref>
                 <Button variant="ghost" size="icon" aria-label="Search users">
-                  <Search className="h-5 w-5 stroke-[#FFD700]" />
+                  <Search className="h-5 w-5 stroke-[#FF8C00]" />
                 </Button>
               </Link>
             )}
@@ -215,7 +230,7 @@ export default function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label="User Profile">
-                    <User className="h-5 w-5 stroke-[#FFD700]" />
+                    <User className="h-5 w-5 stroke-[#FF8C00]" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -236,7 +251,7 @@ export default function Header() {
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/search" passHref>
-                     <DropdownMenuItem>
+                    <DropdownMenuItem>
                       <Search className="mr-2 h-4 w-4" />
                       <span>Search Users</span>
                     </DropdownMenuItem>
@@ -250,13 +265,12 @@ export default function Header() {
               </DropdownMenu>
             ) : (
               <Button variant="ghost" size="icon" onClick={() => setAuthDialogOpen(true)} aria-label="Login or Sign Up">
-                <User className="h-5 w-5 stroke-[#FFD700]" />
+                <User className="h-5 w-5 stroke-[#FF8C00]" />
               </Button>
             )}
           </div>
         </div>
       </header>
-
       {/* Auth Dialog for Email, Phone, and Twitter */}
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -278,7 +292,7 @@ export default function Header() {
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="signin-password" className="text-right">Password</Label>
-                    <Input id="signin-password" type="password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="col-span-3" required/>
+                    <Input id="signin-password" type="password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="col-span-3" required />
                   </div>
                 </div>
                 <DialogFooter>
@@ -291,9 +305,9 @@ export default function Header() {
                 <DialogTitle>Create Account</DialogTitle>
                 <DialogDescription>Start your mindful journey with us.</DialogDescription>
               </DialogHeader>
-               <form onSubmit={handleSignUp}>
+              <form onSubmit={handleSignUp}>
                 <div className="grid gap-4 py-4">
-                   <div className="grid grid-cols-4 items-center gap-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="display-name" className="text-right">Name</Label>
                     <Input id="display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="col-span-3" required />
                   </div>
@@ -312,7 +326,7 @@ export default function Header() {
               </form>
             </TabsContent>
           </Tabs>
-           <div className="relative my-4">
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
             <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
           </div>
@@ -322,7 +336,6 @@ export default function Header() {
           </div>
         </DialogContent>
       </Dialog>
-      
       {/* Phone Auth Dialog */}
       <Dialog open={phoneDialogOpen} onOpenChange={setPhoneDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">

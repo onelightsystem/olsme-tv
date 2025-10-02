@@ -1,15 +1,13 @@
 // Path: src/app/layout.tsx
-// Improvements (Sept 29, 2025):
-// - Kept Toaster, Header, responsive layout, PT Sans via next/font (done, Day 6).
-// - Kept "use client" and Firebase Auth state for user context (done, Day 2).
-// - Fixed Firestore syntax: Replaced `db.collection('logs').add` with `addDoc(collection(db, 'logs'))` (new, resolves runtime error).
-// - Kept imports: `formatErrorLog` from `@lib/utils`, `auth`, `db` from `@lib/firebase/config` (done).
-// - Kept `metadata` import from `app/metadata.ts` for SEO (done, Day 8).
-// - Added retry logic for Firestore writes (new, Day 2).
-// - Kept IPFS logging with auth context (done, Day 4).
-// - Aligns with freemium: Premium users ($4.99) access custom layouts (Business Plan).
+// Improvements (Sept 30, 2025):
+// - Fixed import: Changed `logToIPFS` from `@lib/utils` to `@lib/ipfs-client` (resolves build error).
+// - Added biofeedback audio trigger on auth errors for mindfulness (OLS Red Sea waves).
+// - Added premium user check for custom layout styles (freemium model, $4.99/month).
+// - Optimized `updateUserStatus` with debouncing to reduce Cloud Function calls.
+// - Added ARIA attributes for accessibility (GDPR compliance).
+// - Enhanced error logging with `userId` for traceability.
+// - Aligns with blueprint: PT Sans font, Firebase Auth, IPFS logging, SEO.
 // - Solo Tip: Test with `npm run dev`, check font rendering, log auth state in Firestore/IPFS, verify title in <head>.
-
 'use client';
 import type { Metadata } from 'next';
 import { PT_Sans } from 'next/font/google';
@@ -18,16 +16,19 @@ import { cn } from '@lib/utils';
 import { Toaster } from '@components/ui/toaster';
 import Header from '@components/layout/header';
 import { auth, db } from '@lib/firebase/config';
-import { formatErrorLog, logToIPFS } from '@lib/utils';
+import { formatErrorLog } from '@lib/utils';
+import { logToIPFS } from '@lib/ipfs-client';
+import { triggerBiofeedback } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { debounce } from 'lodash'; // Requires: npm install lodash @types/lodash
 
 const ptSans = PT_Sans({ subsets: ['latin'], weight: ['400', '700'] });
 
-// Retry logic for Firestore writes (new, Day 2)
+// Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
   let attempts = 0;
   while (attempts < maxAttempts) {
@@ -44,57 +45,96 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     const functions = getFunctions();
     const updateUserStatus = httpsCallable(functions, 'updateUserStatus');
 
-    const handleVisibilityChange = () => {
+    // Debounce status updates to reduce Cloud Function calls
+    const debouncedUpdateStatus = debounce(async (status: string) => {
       if (auth.currentUser) {
-        const status = document.visibilityState === 'visible' ? 'online' : 'offline';
-        updateUserStatus({ status }).catch(console.error);
-      }
-    };
-    
-    const handleBeforeUnload = () => {
-        if(auth.currentUser) {
-            updateUserStatus({ status: 'offline' }).catch(console.error);
+        try {
+          await updateUserStatus({ status });
+        } catch (e) {
+          console.error('Status update failed:', e);
         }
+      }
+    }, 500);
+
+    const handleVisibilityChange = () => {
+      const status = document.visibilityState === 'visible' ? 'online' : 'offline';
+      debouncedUpdateStatus(status);
+    };
+
+    const handleBeforeUnload = () => {
+      debouncedUpdateStatus('offline');
     };
 
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
-      if (u) {
-        // Force refresh of the token to get latest custom claims (e.g., isAdmin)
-        await u.getIdToken(true);
-        updateUserStatus({ status: 'online' }).catch(console.error);
-      } else if (user) { // User signed out
-        updateUserStatus({ status: 'offline' }).catch(console.error);
-      }
+      try {
+        if (u) {
+          // Force refresh token for custom claims (e.g., isAdmin)
+          await u.getIdToken(true);
+          debouncedUpdateStatus('online');
 
-      setUser(u);
-      withFirestoreRetry(() =>
-        addDoc(collection(db, 'logs'), {
-          userId: u?.uid || 'anonymous',
-          context: 'layout_auth',
-          status: u ? 'loggedIn' : 'loggedOut',
-          timestamp: new Date(),
-        })
-      ).catch((e) => {
-        withFirestoreRetry(() =>
-          addDoc(collection(db, 'logs'), formatErrorLog(e, 'layoutAuth'))
+          // Check for premium user
+          const userDoc = await getDoc(doc(db, 'users', u.uid));
+          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+        } else if (user) {
+          debouncedUpdateStatus('offline');
+          setIsPremium(false);
+        }
+        setUser(u);
+
+        // Log auth state to Firestore
+        await withFirestoreRetry(() =>
+          addDoc(collection(db, 'logs'), {
+            userId: u?.uid || 'anonymous',
+            context: 'layout_auth',
+            status: u ? 'loggedIn' : 'loggedOut',
+            timestamp: new Date().toISOString(),
+          })
         );
-        logToIPFS({ error: (e as Error).message, context: 'layoutAuth' });
-      });
-      if (u) logToIPFS({ userId: u.uid, action: 'auth_state', context: 'layout' });
+
+        // Log auth state to IPFS
+        if (u) {
+          await logToIPFS({
+            userId: u.uid,
+            action: 'auth_state',
+            context: 'layout',
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (e: any) {
+        // Log error to Firestore
+        await withFirestoreRetry(() =>
+          addDoc(collection(db, 'logs'), formatErrorLog(e, 'layoutAuth', u?.uid || 'anonymous'))
+        );
+
+        // Log error to IPFS
+        await logToIPFS({
+          error: e.message,
+          context: 'layoutAuth',
+          userId: u?.uid || 'anonymous',
+          action: 'error',
+          timestamp: new Date().toISOString(),
+        });
+
+        // Mindfulness: Trigger calming audio on error
+        if (u) {
+          await triggerBiofeedback(u.uid, 'chat', 'https://olsme.com/assets/red-sea-waves.mp3');
+        }
+      }
     });
-    
+
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
-
     return () => {
       unsubscribe();
       window.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      debouncedUpdateStatus.cancel();
     };
   }, [user]);
 
@@ -104,10 +144,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description} />
       </head>
-      <body className={cn('min-h-screen bg-background font-body antialiased')}>
+      <body
+        className={cn(
+          'min-h-screen bg-background font-body antialiased',
+          isPremium && 'premium-layout' // Custom styles for premium users
+        )}
+        role="application"
+      >
         <div className="relative flex min-h-screen flex-col">
           <Header />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1" role="main">
+            {children}
+          </main>
         </div>
         <Toaster />
       </body>
