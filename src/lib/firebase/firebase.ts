@@ -123,7 +123,7 @@ export async function signInWithX() {
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX', '', correlationId));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX', 'unknown', correlationId));
       }
     });
     const {logToIPFS} = await import('@lib/ipfs-client');
