@@ -143,7 +143,7 @@ export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: Re
   } catch (e) {
     await withFirestoreRetry(() => {
       if (e instanceof Error) {
-        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone', '', correlationId));
+        addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone', 'unknown', correlationId));
       }
     });
     const {logToIPFS} = await import('@lib/ipfs-client');
