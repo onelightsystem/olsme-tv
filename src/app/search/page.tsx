@@ -1,6 +1,6 @@
 // Path: src/app/search/page.tsx
 // Improvements (Sept 30, 2025):
-// - Fixed import: Changed `logToIPFS` from `@/lib/utils` to `@/lib/ipfs-client` (resolves build error).
+// - Fixed import: Changed `logToIPFS` from `@lib/utils` to `@lib/ipfs-client` (resolves build error).
 // - Added premium user check for enhanced search visuals (freemium model, $4.99/month).
 // - Added biofeedback audio trigger for search actions (OLS mindfulness).
 // - Enhanced error handling with `userId` in logs for traceability.
@@ -12,20 +12,20 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@hooks/use-toast';
+import { Input } from '@components/ui/input';
+import { Button } from '@components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@components/ui/select';
 import { Search, User, ShieldCheck, Gem } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { logToIPFS } from '@/lib/ipfs-client';
-import { triggerBiofeedback, formatErrorLog } from '@/lib/utils';
-import { auth, db } from '@/lib/firebase/config';
+import { Skeleton } from '@components/ui/skeleton';
+import { logToIPFS } from '@lib/ipfs-client';
+import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
+import { auth, db } from '@lib/firebase/config';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { debounce } from 'lodash';
-import { cn } from '@/lib/utils';
+import { cn } from '@lib/utils';
 
 interface SearchResult {
   uid: string;

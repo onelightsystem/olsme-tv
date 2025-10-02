@@ -15,13 +15,13 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@components/ui/card';
 import { Button } from '@components/ui/button';
 import { Sun } from 'lucide-react';
-import { OlsImages, logImageLoad, validateImageUrl } from '@/lib/placeholder-images';
-import { triggerBiofeedback } from '@/lib/utils';
+import { OlsImages, logImageLoad, validateImageUrl } from '@lib/placeholder-images';
+import { triggerBiofeedback } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { useToast } from '@hooks/use-toast';
 import { useIsMobile } from '@hooks/use-mobile';
 import { cn } from '@lib/utils';
-import { db } from '@/lib/firebase/config';
+import { db } from '@lib/firebase/config';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 
 const meditationPrompts = [

@@ -9,24 +9,24 @@
 // - Solo Tip: Test with `npm run dev`, visit `/admin/users` as admin, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { auth, db } from '@/lib/firebase/config';
+import { auth, db } from '@lib/firebase/config';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@hooks/use-toast';
 import { User as FirebaseUser } from 'firebase/auth';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
+import { Badge } from '@components/ui/badge';
+import { Input } from '@components/ui/input';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem } from '@components/ui/dropdown-menu';
+import { Button } from '@components/ui/button';
 import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@components/ui/skeleton';
 import { ShieldAlert, Users, CircleDot, Gem } from 'lucide-react';
-import { logToIPFS } from '@/lib/ipfs-client';
-import { triggerBiofeedback, formatErrorLog } from '@/lib/utils';
+import { logToIPFS } from '@lib/ipfs-client';
+import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
+import { cn } from '@lib/utils';
 
 type UserData = {
   uid: string;

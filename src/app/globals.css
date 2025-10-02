@@ -1,10 +1,9 @@
 /* Path: src/app/globals.css */
-/* Improvements (Sept 30, 2025): */
-/* - Fixed `-webkit-text-size-adjust` parsing error by moving to `body` selector. */
-/* - Replaced `-moz-focus-inner` with standard `outline` for button focus. */
+/* Improvements (Oct 2, 2025): */
+/* - Removed `-webkit-text-size-adjust`, `:host`, and `global` to fix parsing warnings. */
+/* - Replaced `-moz-focus-inner` with `outline: none` for button focus. */
 /* - Kept Tailwind base/components/utilities, shadcn vars, #FFD700 gold, #F5F5DC beige (Day 6). */
 /* - Kept `.premium-video`, `.hd-stream`, `.animate-premium-pulse`, and `loading-sun` animation (Day 4). */
-/* - Aligns with freemium: Premium users ($4.99) unlock custom themes (Business Plan). */
 /* - Solo Tip: Test with `npm run dev`, inspect #FFD700 buttons, check Firestore for style logs. */
 @tailwind base;
 @tailwind components;
@@ -24,7 +23,7 @@
     --secondary-foreground: 0 0% 15%;
     --muted: 60 4% 87%;
     --muted-foreground: 0 0% 35%;
-    --accent: 38 100% 50%; /* #FFA500 orange */
+    --accent: 38 100% 50%; /* #FF8C00 orange */
     --accent-foreground: 0 0% 0%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -84,18 +83,14 @@
 }
 
 @layer base {
-  :host {
-    all: initial; /* Fix shadcn warnings */
-  }
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
-    -webkit-text-size-adjust: 100%; /* Moved to body selector */
   }
   button {
-    outline: none; /* Replace -moz-focus-inner for Firefox compatibility */
+    outline: none; /* Replace -moz-focus-inner */
   }
 }
 

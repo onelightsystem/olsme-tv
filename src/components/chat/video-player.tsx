@@ -16,12 +16,12 @@ import { Card } from '@components/ui/card';
 import { VideoOff, MicOff, Gem } from 'lucide-react';
 import { Badge } from '@components/ui/badge';
 import { useToast } from '@hooks/use-toast';
-import { db, auth } from '@/lib/firebase/config';
-import { formatErrorLog } from '@/lib/utils';
+import { db, auth } from '@lib/firebase/config';
+import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback } from '@/lib/utils';
+import { triggerBiofeedback } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
+import { cn } from '@lib/utils';
 
 type VideoPlayerProps = {
   isLocal: boolean;

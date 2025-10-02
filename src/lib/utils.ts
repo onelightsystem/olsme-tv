@@ -1,14 +1,16 @@
 // Path: src/lib/utils.ts
-// Improvements (Sept 30, 2025):
+// Improvements (Oct 2, 2025):
+// - Fixed `formatPolitenessScore` to handle undefined `userId` (resolves TypeError).
 // - Enhanced `formatPolitenessScore` to include premium user messages (freemium model).
 // - Added premium user check in `triggerBiofeedback` for custom audio URLs.
 // - Added Firestore logging for validation failures in `validateBiofeedbackEvent`.
 // - Added accessibility option to skip audio for users with sound disabled.
 // - Aligns with blueprint: OLS biofeedback (Red Sea waves) and AI politeness badges.
 // - Solo Tip: Test with `npm run dev`, trigger biofeedback via /search, check Firestore `biofeedback_events`.
+'use client';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { logBiofeedbackEvent, db, auth } from '@/lib/firebase/config';
+import { logBiofeedbackEvent, db, auth } from '@lib/firebase/config';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -23,16 +25,36 @@ interface PolitenessScore {
   topics: number;
 }
 
-export async function formatPolitenessScore(score: PolitenessScore, userId: string) {
+/**
+ * Formats a politeness score and returns an object with the average, badge, and message.
+ *
+ * @param {PolitenessScore} score - The politeness score object.
+ * @param {string} [userId] - Optional user ID. If provided, checks if the user is premium and appends a premium message.
+ *   If `userId` is undefined, the premium check is skipped and the message does not include premium details.
+ * @returns {Promise<{ average: number, badge: string, message: string }>} The formatted politeness score.
+ */
+export async function formatPolitenessScore(score: PolitenessScore, userId?: string) {
   const average = (score.ethical + score.communication + score.listener + score.topics) / 4;
   const badge = average >= 80 ? 'Gold' : average >= 60 ? 'Silver' : 'Bronze';
   let message = average >= 80 ? 'Radiant Light' : average >= 60 ? 'Growing Glow' : 'Seeking Truth';
 
-  // Check for premium user
-  const userDoc = await getDoc(doc(db, 'users', userId));
-  const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
-  if (isPremium) {
-    message += ' - Unlock detailed insights with your Premium subscription!';
+  // Check for premium user only if userId is provided
+  let isPremium = false;
+  if (userId && typeof userId === 'string') {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
+      if (isPremium) {
+        message += ' - Unlock detailed insights with your Premium subscription!';
+      }
+    } catch (e: any) {
+      await addDoc(collection(db, 'logs'), {
+        error: e.message,
+        context: 'formatPolitenessScore',
+        userId: userId || 'unknown',
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   return {
@@ -76,17 +98,14 @@ export async function triggerBiofeedback(
     if (!soundEnabled) {
       return { success: true, message: 'Biofeedback skipped: User sound disabled' };
     }
-
     // Check for premium user custom audio
     const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
     const finalAudioUrl = isPremium && userDoc.data()?.customAudioUrl ? userDoc.data()?.customAudioUrl : audioUrl;
-
     // Validate audio URL
     const response = await fetch(finalAudioUrl, { method: 'HEAD' });
     if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
       throw new Error('Invalid audio URL');
     }
-
     // Retry logic for audio playback
     let attempts = 0;
     const maxAttempts = 3;
@@ -102,7 +121,6 @@ export async function triggerBiofeedback(
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       }
     }
-
     const event = { type: `audio_${type}`, value: 1 };
     await validateBiofeedbackEvent(userId, event);
     await logBiofeedbackEvent(userId, event);

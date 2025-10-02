@@ -6,9 +6,9 @@
 // - Integrated OLS mindfulness: Logs trigger calming notification for premium users.
 // - Solo Tip: Test with `npm run dev`, trigger IPFS logging via /search, check Firestore `ipfs_logs` and `logs`.
 'use client';
-import { logBiofeedbackEvent, db } from '@/lib/firebase/config';
+import { logBiofeedbackEvent, db } from '@lib/firebase/config';
 import { collection, addDoc } from 'firebase/firestore';
-import { triggerBiofeedback } from '@/lib/utils';
+import { triggerBiofeedback } from '@lib/utils';
 
 interface IPFSLogData {
   userId: string;

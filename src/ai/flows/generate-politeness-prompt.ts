@@ -7,9 +7,9 @@
 // - Solo Tip: Test with `npm run genkit:dev`, check Firestore `prompts`/`logs`, IPFS CID.
 
 import { z } from 'zod';
-import { db } from '@/lib/firebase/config';
-import { formatErrorLog } from '@/lib/utils';
-import { logToIPFS } from '@/lib/utils';
+import { db } from '@lib/firebase/config';
+import { formatErrorLog } from '@lib/utils';
+import { logToIPFS } from '@lib/utils';
 import { collection, addDoc } from 'firebase/firestore';
 import { getPolitenessPrompt } from '../actions';
 

@@ -9,10 +9,10 @@
 // - Solo Tip: Test with `npm run dev`, trigger in `waiting-screen.tsx`, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import * as React from 'react';
-import type { ToastActionElement, ToastProps } from '@/components/ui/toast';
+import type { ToastActionElement, ToastProps } from '@components/ui/toast';
 import { formatPolitenessScore } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
-import { db, auth } from '@/lib/firebase/config';
+import { db, auth } from '@lib/firebase/config';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { triggerBiofeedback } from '@lib/utils';
 

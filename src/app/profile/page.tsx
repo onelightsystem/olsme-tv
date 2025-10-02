@@ -1,7 +1,7 @@
 // Path: src/app/profile/page.tsx
 // Improvements (Sept 30, 2025):
 // - Added profile UI with verification level, politeness score, olsPoints (Day 15).
-// - Fixed imports: Changed `auth`, `db`, `requestKYCVerification` from `@lib/firebase` to `@/lib/firebase/config` (Day 16).
+// - Fixed imports: Changed `auth`, `db`, `requestKYCVerification` from `@lib/firebase` to `@lib/firebase/config` (Day 16).
 // - Replaced `logToIPFS` import from `utils.ts` to dynamic import from `ipfs-client.ts` (Day 16, resolves 'electron' SSR error).
 // - Used PT Sans, #FFD700 gold, Radix dialogs (blueprint).
 // - Integrated Firebase Auth, Firestore for user data (Day 2).
@@ -11,17 +11,17 @@
 
 'use client';
 import { useEffect, useState } from 'react';
-import { auth, db, requestKYCVerification } from '@/lib/firebase/config';
+import { auth, db, requestKYCVerification } from '@lib/firebase/config';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@components/ui/card';
+import { Badge } from '@components/ui/badge';
+import { Progress } from '@components/ui/progress';
 import { Sun, ShieldCheck, Gem, Award } from 'lucide-react';
-import { formatPolitenessScore } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
+import { formatPolitenessScore } from '@lib/utils';
+import { Skeleton } from '@components/ui/skeleton';
+import { useToast } from '@hooks/use-toast';
+import { Button } from '@components/ui/button';
 
 type UserProfile = {
   uid: string;
@@ -58,7 +58,7 @@ export default function ProfilePage() {
     const unsubscribeAuth = auth.onAuthStateChanged(async (u) => {
       setUser(u);
       if (u) {
-        const { logToIPFS } = await import('@/lib/ipfs-client');
+        const { logToIPFS } = await import('@lib/ipfs-client');
         await logToIPFS({ userId: u.uid, action: 'profile_view' });
       }
       if (!u) {

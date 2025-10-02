@@ -10,10 +10,10 @@
 // - Solo Tip: Test with `npm run dev`, resize window, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import * as React from 'react';
-import { db, auth } from '@/lib/firebase/config';
-import { formatErrorLog } from '@/lib/utils';
+import { db, auth } from '@lib/firebase/config';
+import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback } from '@/lib/utils';
+import { triggerBiofeedback } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@hooks/use-toast';
 
