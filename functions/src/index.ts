@@ -58,7 +58,7 @@ export const upgradeToPremium = functions.https.onCall(async (data: unknown, con
     return {success: true, message: "Successfully upgraded to premium."};
   } catch (error) {
     functions.logger.error(`Error upgrading user ${uid} to premium:`, error);
-    throw new functions.https.HtsError("internal", "An error occurred while upgrading the account.");
+    throw new functions.https.HttpsError("internal", "An error occurred while upgrading the account.");
   }
 });
 
