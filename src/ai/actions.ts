@@ -8,12 +8,12 @@
 // - Aligns with blueprint: AI Politeness Monitor, IPFS logging, anti-censorship.
 // - Solo Tip: Test with `npm run dev`, send message in ChatPanel, check Firestore `prompts`/`logs`/`biofeedback_events`, IPFS CID.
 'use client';
-import { db } from '@lib/firebase/config';
-import { formatErrorLog } from '@lib/utils';
-import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback } from '@lib/utils';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
-import { generatePolitenessPrompt } from './flows/generate-politeness-prompt';
+import {db} from '@lib/firebase/config';
+import {formatErrorLog} from '@lib/utils';
+import {logToIPFS} from '@lib/ipfs-client';
+import {triggerBiofeedback} from '@lib/utils';
+import {collection, addDoc, doc, getDoc} from 'firebase/firestore';
+import {generatePolitenessPrompt} from './flows/generate-politeness-prompt';
 
 export async function getPolitenessPrompt(conversationHistory: string, userId?: string): Promise<string> {
   if (!conversationHistory.trim()) {
@@ -43,8 +43,8 @@ export async function getPolitenessPrompt(conversationHistory: string, userId?: 
           'https://us-central1-studio-4615914296-4bd91.cloudfunctions.net/getPolitenessPrompt',
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversationHistory, userId, isPremium }),
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({conversationHistory, userId, isPremium}),
           }
         );
         if (response.ok) break;
@@ -76,10 +76,10 @@ export async function getPolitenessPrompt(conversationHistory: string, userId?: 
     });
 
     // Log to IPFS
-    await logToIPFS({ prompt, conversationHistory, userId: userId || 'anonymous', action: 'getPolitenessPrompt' });
+    await logToIPFS({prompt, conversationHistory, userId: userId || 'anonymous', action: 'getPolitenessPrompt'});
 
     // Trigger API endpoint
-    await fetch('/api/prompt', { method: 'POST', body: JSON.stringify({ prompt, userId }) });
+    await fetch('/api/prompt', {method: 'POST', body: JSON.stringify({prompt, userId})});
 
     return prompt;
   } catch (error: any) {

@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { auth, db } from '@lib/firebase/config';
 import { useToast } from '@hooks/use-toast';
 import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
+import { triggerBiofeedback, formatErrorLog, generateCorrelationId, formatInfoLog } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -81,6 +81,7 @@ export default function HomePage() {
     // Fetch potential guests
     const fetchGuests = async () => {
       if (!user) return;
+      const correlationId = generateCorrelationId();
       try {
         const functions = getFunctions();
         const searchUsers = httpsCallable(functions, 'searchUsers');
@@ -91,11 +92,12 @@ export default function HomePage() {
         }
       } catch (e: any) {
         const batch = writeBatch(db); // Fresh batch
-        batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'fetchGuests', user?.uid || 'anonymous'));
+        batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'fetchGuests', user?.uid || 'anonymous', correlationId));
         batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: user?.uid || 'anonymous',
           type: 'error',
           value: 0,
+          correlationId,
           timestamp: new Date(),
         });
         await withFirestoreRetry(() => batch.commit());
@@ -104,6 +106,7 @@ export default function HomePage() {
           action: 'error',
           context: 'fetchGuests',
           error: e.message,
+          correlationId,
           timestamp: new Date().toISOString(),
         });
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load guests.', id: 'fetch-guests-error' });
@@ -143,17 +146,15 @@ export default function HomePage() {
       setLoginOpen(true);
       return;
     }
+    const correlationId = generateCorrelationId();
     try {
       const batch = writeBatch(db); // Fresh batch
-      batch.set(doc(collection(db, 'logs')), {
-        userId: user.uid,
-        context: 'start_chat',
-        timestamp: new Date(),
-      });
+      batch.set(doc(collection(db, 'logs')), formatInfoLog('start_chat', user.uid, correlationId));
       batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'chat_start',
         value: 1,
+        correlationId,
         timestamp: new Date(),
       });
       await withFirestoreRetry(() => batch.commit());
@@ -161,17 +162,19 @@ export default function HomePage() {
         userId: user.uid,
         action: 'start_chat',
         premium: isPremium,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
       toast({ title: 'Chat Started', description: 'Mindful chat initiated!', id: 'chat-start' });
     } catch (e: any) {
       const batch = writeBatch(db); // Fresh batch
-      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'startChat', user.uid));
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'startChat', user.uid, correlationId));
       batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'error',
         value: 0,
+        correlationId,
         timestamp: new Date(),
       });
       await withFirestoreRetry(() => batch.commit());
@@ -180,6 +183,7 @@ export default function HomePage() {
         action: 'error',
         context: 'startChat',
         error: e.message,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       await triggerBiofeedback(user.uid, 'chat');
@@ -189,6 +193,7 @@ export default function HomePage() {
 
   const handleRateGuest = async (rating: 'good' | 'bad') => {
     if (!user || !currentGuest) return;
+    const correlationId = generateCorrelationId();
     try {
       const functions = getFunctions();
       const rateGuest = httpsCallable(functions, 'rateGuest');
@@ -198,12 +203,14 @@ export default function HomePage() {
         userId: user.uid,
         guestId: currentGuest.uid,
         rating,
+        correlationId,
         timestamp: new Date(),
       });
       batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: `rating_${rating}`,
         value: 1,
+        correlationId,
         timestamp: new Date(),
       });
       await withFirestoreRetry(() => batch.commit());
@@ -212,16 +219,18 @@ export default function HomePage() {
         action: `rating_${rating}`,
         guestId: currentGuest.uid,
         premium: isPremium,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       toast({ title: 'Rating Submitted', description: `Rated ${currentGuest.displayName} as ${rating}.`, id: 'rating-submitted' });
     } catch (e: any) {
       const batch = writeBatch(db); // Fresh batch
-      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'rateGuest', user.uid));
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'rateGuest', user.uid, correlationId));
       batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'error',
         value: 0,
+        correlationId,
         timestamp: new Date(),
       });
       await withFirestoreRetry(() => batch.commit());
@@ -230,6 +239,7 @@ export default function HomePage() {
         action: 'error',
         context: 'rateGuest',
         error: e.message,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit rating.', id: 'rating-error' });

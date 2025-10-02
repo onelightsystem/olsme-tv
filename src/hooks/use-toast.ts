@@ -9,12 +9,12 @@
 // - Solo Tip: Test with `npm run dev`, trigger in `waiting-screen.tsx`, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import * as React from 'react';
-import type { ToastActionElement, ToastProps } from '@components/ui/toast';
-import { formatPolitenessScore } from '@lib/utils';
-import { logToIPFS } from '@lib/ipfs-client';
-import { db, auth } from '@lib/firebase/config';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { triggerBiofeedback } from '@lib/utils';
+import type {ToastActionElement, ToastProps} from '@components/ui/toast';
+import {formatPolitenessScore, generateCorrelationId, formatErrorLog} from '@lib/utils';
+import {logToIPFS} from '@lib/ipfs-client';
+import {db, auth} from '@lib/firebase/config';
+import {collection, doc, getDoc, writeBatch} from 'firebase/firestore';
+import {triggerBiofeedback} from '@lib/utils';
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -58,42 +58,42 @@ const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) return;
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId);
-    dispatch({ type: 'REMOVE_TOAST', toastId });
+    dispatch({type: 'REMOVE_TOAST', toastId});
   }, TOAST_REMOVE_DELAY);
   toastTimeouts.set(toastId, timeout);
 };
 
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
-    case 'ADD_TOAST':
-      return { ...state, toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT) };
-    case 'UPDATE_TOAST':
-      return {
-        ...state,
-        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
-      };
-    case 'DISMISS_TOAST': {
-      const { toastId } = action;
-      if (toastId) {
-        addToRemoveQueue(toastId);
-      } else {
-        state.toasts.forEach((toast) => addToRemoveQueue(toast.id));
-      }
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined ? { ...t, open: false } : t
-        ),
-      };
+  case 'ADD_TOAST':
+    return {...state, toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT)};
+  case 'UPDATE_TOAST':
+    return {
+      ...state,
+      toasts: state.toasts.map((t) => (t.id === action.toast.id ? {...t, ...action.toast} : t)),
+    };
+  case 'DISMISS_TOAST': {
+    const {toastId} = action;
+    if (toastId) {
+      addToRemoveQueue(toastId);
+    } else {
+      state.toasts.forEach((toast) => addToRemoveQueue(toast.id));
     }
-    case 'REMOVE_TOAST':
-      if (action.toastId === undefined) return { ...state, toasts: [] };
-      return { ...state, toasts: state.toasts.filter((t) => t.id !== action.toastId) };
+    return {
+      ...state,
+      toasts: state.toasts.map((t) =>
+        t.id === toastId || toastId === undefined ? {...t, open: false} : t
+      ),
+    };
+  }
+  case 'REMOVE_TOAST':
+    if (action.toastId === undefined) return {...state, toasts: []};
+    return {...state, toasts: state.toasts.filter((t) => t.id !== action.toastId)};
   }
 };
 
 const listeners: Array<(state: State) => void> = [];
-let memoryState: State = { toasts: [] };
+let memoryState: State = {toasts: []};
 
 function dispatch(action: Action) {
   memoryState = reducer(memoryState, action);
@@ -102,15 +102,15 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>;
 
-async function toast({ ...props }: Toast) {
+async function toast({...props}: Toast) {
   const id = genId();
+  const correlationId = generateCorrelationId();
   const user = auth.currentUser;
-  const isPremium = user ? (await getDoc(doc(db, 'users', user.uid))).data()?.package === 'premium' : false;
-
-  const update = (props: ToasterToast) => dispatch({ type: 'UPDATE_TOAST', toast: { ...props, id } });
-  const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
+  const update = (props: ToasterToast) => dispatch({type: 'UPDATE_TOAST', toast: {...props, id}});
+  const dismiss = () => dispatch({type: 'DISMISS_TOAST', toastId: id});
 
   try {
+    const isPremium = user ? (await getDoc(doc(db, 'users', user.uid))).data()?.package === 'premium' : false;
     dispatch({
       type: 'ADD_TOAST',
       toast: {
@@ -126,17 +126,19 @@ async function toast({ ...props }: Toast) {
 
     // Log toast to Firestore and IPFS
     const batch = writeBatch(db);
-    batch.set(collection(db, 'logs').doc(), {
+    batch.set(doc(collection(db, 'logs')), {
       userId: user?.uid || 'anonymous',
       context: 'toast',
       title: props.title,
       description: props.description,
+      correlationId,
       timestamp: new Date(),
     });
-    batch.set(collection(db, 'biofeedback_events').doc(), {
+    batch.set(doc(collection(db, 'biofeedback_events')), {
       userId: user?.uid || 'anonymous',
       type: 'toast_display',
       value: 1,
+      correlationId,
       timestamp: new Date(),
     });
     await batch.commit();
@@ -146,6 +148,7 @@ async function toast({ ...props }: Toast) {
       action: 'toast_display',
       title: props.title,
       description: props.description,
+      correlationId,
       timestamp: new Date().toISOString(),
     });
 
@@ -154,28 +157,26 @@ async function toast({ ...props }: Toast) {
       await triggerBiofeedback(user.uid, 'chat', 'https://olsme.com/assets/premium-waves.mp3');
     }
 
-    return { id, dismiss, update };
-  } catch (e: any) {
+    return {id, dismiss, update};
+  } catch (e: unknown) {
     const batch = writeBatch(db);
-    batch.set(collection(db, 'logs').doc(), {
-      userId: user?.uid || 'anonymous',
-      context: 'toast_error',
-      error: e.message,
-      timestamp: new Date(),
-    });
-    batch.set(collection(db, 'biofeedback_events').doc(), {
+    batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'toast_error', user?.uid || 'anonymous', correlationId));
+    batch.set(doc(collection(db, 'biofeedback_events')), {
       userId: user?.uid || 'anonymous',
       type: 'error',
       value: 0,
+      correlationId,
       timestamp: new Date(),
     });
     await batch.commit();
 
+    const errorMessage = e instanceof Error ? e.message : String(e);
     await logToIPFS({
-      error: e.message,
+      error: errorMessage,
       context: 'toast_error',
       userId: user?.uid || 'anonymous',
       action: 'error',
+      correlationId,
       timestamp: new Date().toISOString(),
     });
 
@@ -183,7 +184,7 @@ async function toast({ ...props }: Toast) {
       await triggerBiofeedback(user.uid, 'chat');
     }
 
-    return { id, dismiss, update };
+    return {id, dismiss, update};
   }
 }
 
@@ -202,8 +203,9 @@ async function toastPolitenessScore({
   userId?: string;
   isPremium?: boolean;
 }) {
+  const correlationId = generateCorrelationId();
   try {
-    const { badge, message } = await formatPolitenessScore({ ethical, communication, listener, topics }, userId);
+    const {badge, message} = await formatPolitenessScore({ethical, communication, listener, topics}, userId);
     const enhancedMessage = isPremium
       ? `${message} - Premium insights for mindful chats!`
       : message;
@@ -211,21 +213,23 @@ async function toastPolitenessScore({
     const toastProps = {
       title: `Politeness: ${badge}`,
       description: enhancedMessage,
-      action: badge === 'Bronze' ? { label: 'Improve', onClick: () => window.location.href = '/tips' } : undefined,
+      action: badge === 'Bronze' ? {label: 'Improve', onClick: () => window.location.href = '/tips'} : undefined,
       'aria-live': 'polite' as const, // Accessibility
     };
 
     const batch = writeBatch(db);
-    batch.set(collection(db, 'politeness_scores').doc(), {
+    batch.set(doc(collection(db, 'politeness_scores')), {
       userId,
-      score: { ethical, communication, listener, topics },
+      score: {ethical, communication, listener, topics},
       badge,
+      correlationId,
       timestamp: new Date(),
     });
-    batch.set(collection(db, 'biofeedback_events').doc(), {
+    batch.set(doc(collection(db, 'biofeedback_events')), {
       userId,
       type: 'politeness_toast',
       value: 1,
+      correlationId,
       timestamp: new Date(),
     });
     await batch.commit();
@@ -235,6 +239,7 @@ async function toastPolitenessScore({
       action: 'politeness_toast',
       badge,
       message: enhancedMessage,
+      correlationId,
       timestamp: new Date().toISOString(),
     });
 
@@ -244,27 +249,25 @@ async function toastPolitenessScore({
     }
 
     return toast(toastProps);
-  } catch (e: any) {
+  } catch (e: unknown) {
     const batch = writeBatch(db);
-    batch.set(collection(db, 'logs').doc(), {
-      userId,
-      context: 'toastPolitenessScore_error',
-      error: e.message,
-      timestamp: new Date(),
-    });
-    batch.set(collection(db, 'biofeedback_events').doc(), {
+    batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'toastPolitenessScore_error', userId, correlationId));
+    batch.set(doc(collection(db, 'biofeedback_events')), {
       userId,
       type: 'error',
       value: 0,
+      correlationId,
       timestamp: new Date(),
     });
     await batch.commit();
 
+    const errorMessage = e instanceof Error ? e.message : String(e);
     await logToIPFS({
-      error: e.message,
+      error: errorMessage,
       context: 'toastPolitenessScore_error',
       userId,
       action: 'error',
+      correlationId,
       timestamp: new Date().toISOString(),
     });
 
@@ -295,8 +298,8 @@ function useToast() {
     ...state,
     toast,
     toastPolitenessScore,
-    dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }),
+    dismiss: (toastId?: string) => dispatch({type: 'DISMISS_TOAST', toastId}),
   };
 }
 
-export { useToast, toast, toastPolitenessScore };
+export {useToast, toast, toastPolitenessScore};

@@ -5,7 +5,7 @@
 // - Aligns with blueprint: Metadata enhances discoverability, countering elite digital noise.
 // - Solo Tip: Test with `npm run dev`, check <head> title in browser.
 
-import type { Metadata } from 'next';
+import type {Metadata} from 'next';
 
 export const metadata: Metadata = {
   title: 'Awake Chat',

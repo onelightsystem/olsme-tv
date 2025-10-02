@@ -6,12 +6,12 @@
 // - Aligns with freemium: Premium users ($4.99) unlock advanced AI insights (Business Plan).
 // - Solo Tip: Test with `npm run genkit:dev`, check Firestore `prompts`/`logs`, IPFS CID.
 
-import { z } from 'zod';
-import { db } from '@lib/firebase/config';
-import { formatErrorLog } from '@lib/utils';
-import { logToIPFS } from '@lib/utils';
-import { collection, addDoc } from 'firebase/firestore';
-import { getPolitenessPrompt } from '../actions';
+import {z} from 'zod';
+import {db} from '@lib/firebase/config';
+import {formatErrorLog} from '@lib/utils';
+import {logToIPFS} from '@lib/utils';
+import {collection, addDoc} from 'firebase/firestore';
+import {getPolitenessPrompt} from '../actions';
 
 export const GeneratePolitenessPromptInputSchema = z.object({
   conversationHistory: z.string().describe('The recent conversation history between the users.'),
@@ -36,12 +36,12 @@ export async function generatePolitenessPrompt(input: GeneratePolitenessPromptIn
       userId: userId || 'anonymous',
       timestamp: new Date(),
     });
-    await logToIPFS({ prompt, conversationHistory: validatedInput.conversationHistory, userId });
-    return { politenessPrompt: prompt };
+    await logToIPFS({prompt, conversationHistory: validatedInput.conversationHistory, userId});
+    return {politenessPrompt: prompt};
   } catch (e) {
     if (e instanceof Error) {
-        await addDoc(collection(db, 'logs'), formatErrorLog(e, 'generatePolitenessPrompt'));
-        await logToIPFS({ error: e.message, context: 'generatePolitenessPrompt' });
+      await addDoc(collection(db, 'logs'), formatErrorLog(e, 'generatePolitenessPrompt'));
+      await logToIPFS({error: e.message, context: 'generatePolitenessPrompt'});
     }
     throw e;
   }
