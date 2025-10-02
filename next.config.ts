@@ -1,11 +1,9 @@
 // Path: next.config.ts
-// Improvements (Sept 30, 2025):
-// - Removed invalid `srcDir` option to fix build warning (Next.js 15.5.3 compatibility).
-// - Kept Webpack mock for `electron` to resolve `electron-fetch` build error.
-// - Added `NEXT_PUBLIC_IPFS_URL` to environment variables for IPFS flexibility.
-// - Kept TypeScript/ESLint ignore for MVP speed (Month 1).
-// - Kept image domains for OLS assets and placeholders.
-// - Solo Tip: Run `npm run build` to verify no warnings, test images from olsme.com.
+// Improvements (Oct 2, 2025):
+// - Added mocks for `node:fs` and `node:net` to resolve `ipfs-http-client` errors.
+// - Removed invalid `srcDir` option (Next.js 15.5.3 compatibility).
+// - Kept Webpack mock for `electron` and image domains.
+// - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -20,11 +18,10 @@ const nextConfig = {
       { protocol: 'https', hostname: 'placehold.co', pathname: '/**' },
       { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/**' },
       { protocol: 'https', hostname: 'picsum.photos', pathname: '/**' },
-      { protocol: 'https', hostname: 'olsme.com', pathname: '/assets/**' }, // OLS meditation assets
+      { protocol: 'https', hostname: 'olsme.com', pathname: '/assets/**' },
     ],
   },
   env: {
-    // Secure Firebase keys (Day 2, avoid hardcoding)
     FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
     FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN,
     FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
@@ -33,10 +30,12 @@ const nextConfig = {
     FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
     NEXT_PUBLIC_IPFS_URL: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001',
   },
-  webpack: (config) => {
+  webpack: (config: import('webpack').Configuration) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
-      electron: false, // Mock electron to resolve `electron-fetch` error
+      electron: false,
+      'node:fs': false, // Mock node:fs
+      'node:net': false, // Mock node:net
     };
     return config;
   },

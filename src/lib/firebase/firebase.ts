@@ -21,7 +21,7 @@ import {
 } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { collection, addDoc, updateDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { formatErrorLog } from '@/lib/utils';
+import { formatErrorLog } from '@lib/utils';
 import { auth, db } from './config';
 
 // Retry logic for Firestore writes
@@ -67,7 +67,7 @@ export const createUserDocument = async (userData: UserData) => {
   await withFirestoreRetry(() =>
     setDoc(userRef, serializableUserData, { merge: true }) // Use merge to avoid overwriting existing data
   );
-  const { logToIPFS } = await import('@/lib/ipfs-client');
+  const { logToIPFS } = await import('@lib/ipfs-client');
   await logToIPFS(serializableUserData);
 };
 
@@ -85,7 +85,7 @@ export async function signUpWithEmail(email: string, password: string, displayNa
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'signUpWithEmail'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'signUpWithEmail' });
     throw e;
   }
@@ -95,7 +95,7 @@ export async function signUpWithEmail(email: string, password: string, displayNa
 export async function signInWithEmail(email: string, password: string) {
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ userId: result.user.uid, action: 'signInWithEmail' });
     return result.user;
   } catch (e) {
@@ -104,7 +104,7 @@ export async function signInWithEmail(email: string, password: string) {
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithEmail'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'signInWithEmail' });
     throw e;
   }
@@ -123,7 +123,7 @@ export async function signInWithX() {
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithX'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'signInWithX' });
     throw e;
   }
@@ -133,7 +133,7 @@ export async function signInWithX() {
 export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier): Promise<ConfirmationResult> {
   try {
     const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ action: 'signInWithPhone_sent', phoneNumber });
     return confirmationResult;
   } catch (e) {
@@ -142,7 +142,7 @@ export async function signInWithPhone(phoneNumber: string, recaptchaVerifier: Re
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'signInWithPhone'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'signInWithPhone' });
     throw e;
   }
@@ -153,7 +153,7 @@ export async function updatePolitenessScore(userId: string, score: { ethical: nu
   try {
     const userRef = doc(db, 'users', userId);
     await withFirestoreRetry(() => updateDoc(userRef, { politenessScore: score }));
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ userId, score, action: 'updatePolitenessScore' });
     // Trigger the Cloud Function to update custom claims
     const functions = getFunctions();
@@ -170,7 +170,7 @@ export async function updatePolitenessScore(userId: string, score: { ethical: nu
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'updatePolitenessScore'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'updatePolitenessScore' });
     throw e;
   }
@@ -187,7 +187,7 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
       timestamp: new Date(),
     };
     await withFirestoreRetry(() => addDoc(collection(db, 'biofeedback'), logData));
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS(logData);
   } catch (e) {
     await withFirestoreRetry(() => {
@@ -195,7 +195,7 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
         addDoc(collection(db, 'logs'), formatErrorLog(e, 'logBiofeedbackEvent'));
       }
     });
-    const { logToIPFS } = await import('@/lib/ipfs-client');
+    const { logToIPFS } = await import('@lib/ipfs-client');
     await logToIPFS({ error: (e as Error).message, context: 'logBiofeedbackEvent' });
     throw e;
   }
@@ -213,7 +213,7 @@ export async function requestKYCVerification() {
       email: auth.currentUser.email,
     });
     if (response.data.success) {
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ userId: auth.currentUser.uid, action: 'request_kyc' });
     } else {
       throw new Error(response.data.message || 'Failed to send verification request.');
@@ -221,7 +221,7 @@ export async function requestKYCVerification() {
   } catch (error) {
     if (error instanceof Error) {
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'requestKYCVerification'));
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'requestKYCVerification' });
     }
     throw error;

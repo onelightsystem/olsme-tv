@@ -9,15 +9,15 @@
 // - Solo Tip: Test with `npm run dev`, visit `/about`, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
+import { Button } from '@components/ui/button';
 import { Sun, Gem } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase/config';
-import { logToIPFS } from '@/lib/ipfs-client';
-import { triggerBiofeedback } from '@/lib/utils';
+import { useToast } from '@hooks/use-toast';
+import { auth, db } from '@lib/firebase/config';
+import { logToIPFS } from '@lib/ipfs-client';
+import { triggerBiofeedback } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
+import { cn } from '@lib/utils';
 import Link from 'next/link';
 
 // Retry logic for Firestore writes

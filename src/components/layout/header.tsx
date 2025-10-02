@@ -6,7 +6,7 @@
 // - For guests, the icon opens a sign-in/sign-up dialog with Email/Phone/Twitter options.
 // - For logged-in users, the icon opens a dropdown menu with Profile, Search, and Sign Out.
 // - Maintained all existing authentication logic (Email, Phone, Twitter) (Day 15).
-// - Fixed import: Changed `signInWithX`, `signInWithPhone`, `signUpWithEmail`, `signInWithEmail`, `createUserDocument` from `@lib/firebase` to `@/lib/firebase/config` (Day 16).
+// - Fixed import: Changed `signInWithX`, `signInWithPhone`, `signUpWithEmail`, `signInWithEmail`, `createUserDocument` from `@lib/firebase` to `@lib/firebase/config` (Day 16).
 // - Kept dynamic `logToIPFS` import from `ipfs-client.ts` to prevent SSR `electron` error (Day 16).
 // - Kept PT Sans, #FFD700 gold, Radix dialogs (blueprint).
 // - Kept IPFS logging for auth actions (Day 4).
@@ -15,17 +15,17 @@
 'use client';
 import Link from 'next/link';
 import { Sun, User, Volume2, Phone, Mail, LogOut, Twitter, Search, Shield } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@components/ui/button';
 import {
   signInWithX,
   signInWithPhone,
   signUpWithEmail,
   signInWithEmail,
   createUserDocument,
-} from '@/lib/firebase/config';
-import { auth, db } from '@/lib/firebase/config';
-import { triggerBiofeedback, formatErrorLog } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+} from '@lib/firebase/config';
+import { auth, db } from '@lib/firebase/config';
+import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
+import { useToast } from '@hooks/use-toast';
 import { useEffect, useState, useRef } from 'react';
 import { RecaptchaVerifier, ConfirmationResult, signOut, User as FirebaseUser, IdTokenResult } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
@@ -36,7 +36,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from '@components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,10 +44,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+} from '@components/ui/dropdown-menu';
+import { Input } from '@components/ui/input';
+import { Label } from '@components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@components/ui/tabs';
 
 export default function Header() {
   const { toast } = useToast();
@@ -87,12 +87,12 @@ export default function Header() {
       await signInWithX();
       toast({ title: 'Logged In', description: 'Welcome to Awake Chat!' });
       setAuthDialogOpen(false);
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ userId: auth.currentUser?.uid, action: 'signInWithX' });
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'headerLoginX'));
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'headerLoginX' });
       toast({ variant: 'destructive', title: 'Error', description: 'Login with X failed.' });
     }
@@ -148,7 +148,7 @@ export default function Header() {
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'phoneSignInRequest'));
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'phoneSignInRequest' });
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to send code. Please check the number and try again.' });
     }
@@ -172,12 +172,12 @@ export default function Header() {
       setConfirmationResult(null);
       setPhoneNumber('');
       setVerificationCode('');
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ userId: user.uid, action: 'signInWithPhone' });
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'phoneSignInVerify'));
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'phoneSignInVerify' });
       toast({ variant: 'destructive', title: 'Error', description: 'Invalid verification code.' });
     }
@@ -195,7 +195,7 @@ export default function Header() {
     } catch (e) {
       const error = e as Error;
       await addDoc(collection(db, 'logs'), formatErrorLog(error, 'headerBiofeedback'));
-      const { logToIPFS } = await import('@/lib/ipfs-client');
+      const { logToIPFS } = await import('@lib/ipfs-client');
       await logToIPFS({ error: error.message, context: 'headerBiofeedback' });
       toast({ variant: 'destructive', title: 'Error', description: 'Biofeedback failed.' });
     }

@@ -1,30 +1,29 @@
 // Path: src/app/page.tsx
 // Improvements (Oct 2, 2025):
+// - Fixed Firestore batch write syntax to use `doc(collection(db, 'collectionName'))`.
+// - Ensured fresh WriteBatch instances to avoid reuse after commit (resolves FirebaseError).
 // - Replaced popup with dual-screen layout: left (guest profiles), right (camera window).
-// - Added chat option (closed by default, opens on click).
-// - Added politeness toggle icon and guest rating (good/bad) with Firestore/IPFS logging.
-// - Added next/stop buttons for chat navigation.
-// - Added login window at top for random video awaken chat.
+// - Added chat option, politeness toggle, guest rating, next/stop buttons, login window.
 // - Integrated premium visuals/audio ($4.99/month) and mindfulness prompts.
 // - Ensured accessibility with ARIA attributes (GDPR compliance).
 // - Solo Tip: Test with `npm run dev`, visit `/`, check Firestore `ratings`/`logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { auth, db } from '@/lib/firebase/config';
-import { useToast } from '@/hooks/use-toast';
-import { logToIPFS } from '@/lib/ipfs-client';
-import { triggerBiofeedback, formatErrorLog } from '@/lib/utils';
-import { collection, addDoc, doc, getDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { auth, db } from '@lib/firebase/config';
+import { useToast } from '@hooks/use-toast';
+import { logToIPFS } from '@lib/ipfs-client';
+import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
+import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
+import { Button } from '@components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@components/ui/dialog';
 import { Sun, User, ThumbsUp, ThumbsDown, MessageSquare, ShieldCheck, ArrowRight, StopCircle, Gem } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import ChatPanel from '@/components/chat/chat-panel';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@lib/utils';
+import ChatPanel from '@components/chat/chat-panel';
+import { Alert, AlertTitle, AlertDescription } from '@components/ui/alert';
 
 interface Guest {
   uid: string;
@@ -62,7 +61,6 @@ export default function HomePage() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -89,12 +87,12 @@ export default function HomePage() {
         const response = (await searchUsers({ query: '', verificationLevel: 'all' })) as { data: { users: Guest[] } };
         setGuests(response.data.users);
         if (response.data.users.length > 0) {
-            setCurrentGuest(response.data.users[0]);
+          setCurrentGuest(response.data.users[0]);
         }
       } catch (e: any) {
-        const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'fetchGuests', user?.uid || 'anonymous'));
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        const batch = writeBatch(db); // Fresh batch
+        batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'fetchGuests', user?.uid || 'anonymous'));
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: user?.uid || 'anonymous',
           type: 'error',
           value: 0,
@@ -112,7 +110,7 @@ export default function HomePage() {
       }
     };
     if (user) {
-        fetchGuests();
+      fetchGuests();
     }
   }, [user, toast]);
 
@@ -122,7 +120,6 @@ export default function HomePage() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setHasCameraPermission(true);
         setLocalStream(stream);
-
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -136,9 +133,8 @@ export default function HomePage() {
         });
       }
     };
-
     if (user) {
-        getCameraPermission();
+      getCameraPermission();
     }
   }, [user, toast]);
 
@@ -148,13 +144,13 @@ export default function HomePage() {
       return;
     }
     try {
-      const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), {
+      const batch = writeBatch(db); // Fresh batch
+      batch.set(doc(collection(db, 'logs')), {
         userId: user.uid,
         context: 'start_chat',
         timestamp: new Date(),
       });
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'chat_start',
         value: 1,
@@ -170,9 +166,9 @@ export default function HomePage() {
       await triggerBiofeedback(user.uid, 'chat', isPremium ? 'https://olsme.com/assets/premium-waves.mp3' : undefined);
       toast({ title: 'Chat Started', description: 'Mindful chat initiated!', id: 'chat-start' });
     } catch (e: any) {
-      const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'startChat', user.uid));
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      const batch = writeBatch(db); // Fresh batch
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'startChat', user.uid));
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'error',
         value: 0,
@@ -197,15 +193,14 @@ export default function HomePage() {
       const functions = getFunctions();
       const rateGuest = httpsCallable(functions, 'rateGuest');
       await rateGuest({ guestId: currentGuest.uid, rating });
-
-      const batch = writeBatch(db);
-      batch.set(collection(db, 'ratings').doc(), {
+      const batch = writeBatch(db); // Fresh batch
+      batch.set(doc(collection(db, 'ratings')), {
         userId: user.uid,
         guestId: currentGuest.uid,
         rating,
         timestamp: new Date(),
       });
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: `rating_${rating}`,
         value: 1,
@@ -221,9 +216,9 @@ export default function HomePage() {
       });
       toast({ title: 'Rating Submitted', description: `Rated ${currentGuest.displayName} as ${rating}.`, id: 'rating-submitted' });
     } catch (e: any) {
-      const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'rateGuest', user.uid));
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      const batch = writeBatch(db); // Fresh batch
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'rateGuest', user.uid));
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: user.uid,
         type: 'error',
         value: 0,
@@ -254,7 +249,7 @@ export default function HomePage() {
       setLocalStream(null);
     }
     if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      videoRef.current.srcObject = null;
     }
     setHasCameraPermission(null);
     setChatOpen(false);
@@ -265,21 +260,21 @@ export default function HomePage() {
   if (loading) {
     return <div className="container mx-auto p-4 flex justify-center items-center h-screen">Loading...</div>;
   }
-  
+
   if (!user) {
     return (
-        <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                <DialogTitle>Login to Begin Random Video Awaken Chat</DialogTitle>
-                <DialogDescription>Sign in to start your mindful chat experience.</DialogDescription>
-                </DialogHeader>
-                <Button asChild>
-                <Link href="/profile">Sign In / Sign Up</Link>
-                </Button>
-            </DialogContent>
+      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Login to Begin Random Video Awaken Chat</DialogTitle>
+            <DialogDescription>Sign in to start your mindful chat experience.</DialogDescription>
+          </DialogHeader>
+          <Button asChild>
+            <Link href="/profile">Sign In / Sign Up</Link>
+          </Button>
+        </DialogContent>
       </Dialog>
-    )
+    );
   }
 
   return (
@@ -303,8 +298,8 @@ export default function HomePage() {
                       <p className="font-semibold">{guest.displayName}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className={cn(guest.package === 'premium' && "text-primary font-bold flex items-center gap-1")}>
-                            {guest.package === 'premium' && <Gem className="h-3 w-3" />}
-                            {guest.package}
+                          {guest.package === 'premium' && <Gem className="h-3 w-3" />}
+                          {guest.package}
                         </span>
                         <span>|</span>
                         <span>{guest.verificationLevel}</span>
@@ -327,7 +322,6 @@ export default function HomePage() {
             )}
           </CardContent>
         </Card>
-
         {/* Right Screen: Camera Window */}
         <Card className={cn('shadow-xl bg-card/80 backdrop-blur-sm', isPremium && 'premium-video animate-premium-pulse')}>
           <CardHeader>
@@ -338,17 +332,16 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-                 <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted />
+              <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted />
             </div>
-             {hasCameraPermission === false && (
-                <Alert variant="destructive" className="mt-4">
-                    <AlertTitle>Camera Access Required</AlertTitle>
-                    <AlertDescription>
-                        Please allow camera access to use this feature.
-                    </AlertDescription>
-                </Alert>
+            {hasCameraPermission === false && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertTitle>Camera Access Required</AlertTitle>
+                <AlertDescription>
+                  Please allow camera access to use this feature.
+                </AlertDescription>
+              </Alert>
             )}
-
             <div className="flex justify-center flex-wrap gap-2 mt-4">
               <Button
                 variant="ghost"

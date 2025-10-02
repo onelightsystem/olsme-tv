@@ -9,10 +9,10 @@
 // - Aligned with blueprint: OLS imagery, IPFS logging, freemium images.
 // - Solo Tip: Test with `npm run dev`, use in `waiting-screen.tsx`, check Firestore `image_logs`/`logs`/`biofeedback_events`, IPFS CID.
 'use client';
-import { db, auth } from '@/lib/firebase/config';
-import { formatErrorLog } from '@/lib/utils';
+import { db, auth } from '@lib/firebase/config';
+import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback } from '@/lib/utils';
+import { triggerBiofeedback } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import placeholderData from './placeholder-images.json';
 

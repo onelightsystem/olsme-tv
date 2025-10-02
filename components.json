@@ -6,15 +6,15 @@
   "tailwind": {
     "config": "tailwind.config.ts",
     "css": "src/app/globals.css",
-    "baseColor": "yellow", // Align with #FFD700 gold
+    "baseColor": "yellow",
     "cssVariables": true,
     "prefix": ""
   },
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
+    "utils": "@lib/utils",
+    "ui": "@components/ui",
+    "lib": "@lib",
     "hooks": "@/hooks"
   },
   "iconLibrary": "lucide"

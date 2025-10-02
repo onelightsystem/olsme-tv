@@ -1,6 +1,7 @@
 {
   "name": "olsme-tv",
   "version": "0.2.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
@@ -8,8 +9,8 @@
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src functions/src --fix",
+    "typecheck": "tsc --noEmit && tsc --noEmit --project functions/tsconfig.json"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -45,10 +46,11 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.10.0",
     "genkit": "^1.14.1",
-    "ipfs-http-client": "^60.0.1",
+    "ipfs-http-client": "^58.0.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "next": "15.5.3",
+    "node-fetch": "^2.6.7",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -63,6 +65,10 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/webpack": "^5.28.5",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "genkit-cli": "^1.14.1",
     "postcss": "^8",
