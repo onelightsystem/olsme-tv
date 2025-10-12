@@ -2,16 +2,14 @@
 ├── apphosting.yaml
 ├── components.json
 ├── docs
-│   └── blueprint.md
+│   ├── blueprint.md
+│   ├── project-tree.md
+│   └── security.md
+├── eslint.config.js
 ├── firebase.json
 ├── firestore.rules
 ├── functions
-│   ├── firebase-debug.log
-│   ├── functions
-│   │   └── package.json
-│   ├── lib
-│   │   ├── index.js
-│   │   └── index.js.map
+│   ├── eslint.config.js
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── src
@@ -20,38 +18,6 @@
 │   └── tsconfig.json
 ├── next-env.d.ts
 ├── next.config.ts
-├── out
-│   ├── _next
-│   │   ├── static
-│   │   │   ├── chunks
-│   │   │   │   ├── 255-23f2be21cc66949d.js
-│   │   │   │   ├── 4bd1b696-21f374d1156f834a.js
-│   │   │   │   ├── 732-7e53ef2a744a6813.js
-│   │   │   │   ├── 747-aa28d88b8366c3e7.js
-│   │   │   │   ├── 933-1ba1efa53f7ecfcc.js
-│   │   │   │   ├── app
-│   │   │   │   │   ├── _not-found
-│   │   │   │   │   │   └── page-74f4a4487b537ce2.js
-│   │   │   │   │   ├── layout-aff5cbc1b5ec2ba5.js
-│   │   │   │   │   └── page-00f301ab02451bb4.js
-│   │   │   │   ├── framework-a6e0b7e30f98059a.js
-│   │   │   │   ├── main-8ae80e654950d758.js
-│   │   │   │   ├── main-app-9b37515ce1d76144.js
-│   │   │   │   ├── pages
-│   │   │   │   │   ├── _app-7d307437aca18ad4.js
-│   │   │   │   │   └── _error-cb2a52f75f2162e2.js
-│   │   │   │   ├── polyfills-42372ed130431b0a.js
-│   │   │   │   └── webpack-305d99588bad0856.js
-│   │   │   ├── css
-│   │   │   │   └── 8203db5c0706db7d.css
-│   │   │   └── ZzMixLzWWfo_cpZ1GyrLK
-│   │   │       ├── _buildManifest.js
-│   │   │       └── _ssgManifest.js
-│   │   └── ZzMixLzWWfo_cpZ1GyrLK
-│   ├── 404.html
-│   ├── favicon.ico
-│   ├── index.html
-│   └── index.txt
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.mjs
@@ -64,6 +30,8 @@
 │   │   │   └── generate-politeness-prompt.ts
 │   │   └── genkit.ts
 │   ├── app
+│   │   ├── about
+│   │   │   └── page.tsx
 │   │   ├── admin
 │   │   │   └── users
 │   │   │       └── page.tsx
@@ -120,19 +88,11 @@
 │   │       ├── toast.tsx
 │   │       ├── toaster.tsx
 │   │       └── tooltip.tsx
-│   ├── hooks
-│   │   ├── use-mobile.tsx
-│   │   └── use-toast.ts
-│   └── lib
-│       ├── firebase
-│       │   └── config.ts
-│       ├── firebase.ts
-│       ├── placeholder-images.json
-│       ├── placeholder-images.ts
-│       └── utils.ts
+│   └── hooks
+│       ├── use-mobile.tsx
+│       └── use-toast.ts
 ├── tailwind.config.ts
-├── tree.txt
 ├── tsconfig.json
 └── tsconfig.tsbuildinfo
 
-31 directories, 105 files
+18 directories, 78 files
