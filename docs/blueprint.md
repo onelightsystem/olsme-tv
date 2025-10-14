@@ -44,3 +44,5 @@
 
 ## Final Reflection (Day 18/30, Oct 2, 2025)
 Version 0.2 is deployed (`https://studio-4615914296-4bd91.web.app`) with a dual-screen chat interface, signup/login, free/premium packages ($4.99/month for HD streams, custom audio, analytics), guest rating, and IPFS logging. Fixed CORS errors, Firestore batch issues, and CSS warnings. Next steps: Implement user reporting (Days 19-21) and full AI politeness integration (Month 2, TensorFlow). **Journal**: How does this interface light your path? Let’s counter shadows together—reach via @asvitloaten on X. #SeekTruth
+## project tree update
+tree -I 'node_modules|.next|out|lib' > docs/project-tree.md
