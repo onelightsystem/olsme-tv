@@ -180,10 +180,10 @@ export const updateUserStatus = onCall(async (request: CallableRequest<{ status:
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
-  const data = request.data;
+  const data = request.data ?? {};
   const {status} = data;
   const uid = auth.uid;
-  if (!["online", "offline"].includes(status)) {
+  if (typeof status !== "string" || !["online", "offline"].includes(status)) {
     throw new HttpsError("invalid-argument", "Status must be 'online' or 'offline'.");
   }
   const userStatusRef = db.collection("user_status").doc(uid);
