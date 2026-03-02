@@ -32,16 +32,16 @@ To run the project locally:
 
 ### Environment (IPFS)
 
-If you use Infura for IPFS uploads, set one of the following in `.env.local`:
+IPFS uploads are handled server-side so credentials are never exposed to the browser. Set one of the following in `.env.local` (no `NEXT_PUBLIC_` prefix):
 
-- `NEXT_PUBLIC_IPFS_AUTH_HEADER` (full auth header, e.g. `Basic ...`)
+- `IPFS_AUTH_HEADER` (full auth header, e.g. `Basic ...`)
 - or both:
-  - `NEXT_PUBLIC_IPFS_INFURA_PROJECT_ID`
-  - `NEXT_PUBLIC_IPFS_INFURA_PROJECT_SECRET`
+  - `IPFS_INFURA_PROJECT_ID`
+  - `IPFS_INFURA_PROJECT_SECRET`
 
 Optional:
 
-- `NEXT_PUBLIC_IPFS_URL` (defaults to `https://ipfs.infura.io:5001`)
+- `IPFS_URL` (defaults to `https://ipfs.infura.io:5001`)
 
 Without auth on an Infura URL, IPFS uploads are skipped and the app falls back to Firestore logs.
 

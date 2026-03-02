@@ -56,7 +56,7 @@ export async function logToIPFS(data: IPFSLogData) {
     const maxAttempts = 3;
     while (attempts < maxAttempts) {
       try {
-        const response = await fetch('/api/ipfs', {
+        const response = await fetch('/api/ipfs-upload', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({...data, correlationId})
@@ -64,7 +64,7 @@ export async function logToIPFS(data: IPFSLogData) {
         if (response.status === 503) {
           if (!warnedMissingInfuraAuth) {
             warnedMissingInfuraAuth = true;
-            console.warn('IPFS logging disabled: server-side IPFS auth not configured.');
+            console.warn('IPFS logging disabled: server-side IPFS credentials not configured. Set IPFS_AUTH_HEADER or IPFS_INFURA_PROJECT_ID/IPFS_INFURA_PROJECT_SECRET.');
           }
           await safeAddLog({
             userId,
@@ -75,12 +75,13 @@ export async function logToIPFS(data: IPFSLogData) {
           });
           return null;
         }
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           console.warn('IPFS upload unauthorized; skipping upload and using Firestore fallback.');
           await safeAddLog({
             userId,
             action,
             context: 'ipfs_unauthorized',
+            error: 'Unauthorized',
             correlationId,
             timestamp: new Date().toISOString()
           });
@@ -89,11 +90,10 @@ export async function logToIPFS(data: IPFSLogData) {
         if (!response.ok) {
           throw new Error(`IPFS API responded with status ${response.status}`);
         }
-        const json = await response.json() as {cid?: string; error?: string};
+        const json = await response.json() as {cid?: string};
         cid = json.cid ?? null;
         break;
       } catch (err: unknown) {
-        const errMessage = err instanceof Error ? err.message : String(err);
         attempts++;
         if (attempts === maxAttempts) {
           console.warn('IPFS upload failed, falling back to local Firestore');
