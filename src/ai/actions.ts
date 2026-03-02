@@ -13,7 +13,6 @@ import {formatErrorLog} from '@lib/utils';
 import {logToIPFS} from '@lib/ipfs-client';
 import {triggerBiofeedback} from '@lib/utils';
 import {collection, addDoc, doc, getDoc} from 'firebase/firestore';
-import {generatePolitenessPrompt} from './flows/generate-politeness-prompt';
 
 export async function getPolitenessPrompt(conversationHistory: string, userId?: string): Promise<string> {
   if (!conversationHistory.trim()) {
@@ -82,15 +81,16 @@ export async function getPolitenessPrompt(conversationHistory: string, userId?: 
     await fetch('/api/prompt', {method: 'POST', body: JSON.stringify({prompt, userId})});
 
     return prompt;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const mockPrompt = 'Let’s keep the conversation respectful and mindful.';
+    const errorMessage = error instanceof Error ? error.message : String(error);
     
     // Log error to Firestore
     await addDoc(collection(db, 'logs'), formatErrorLog(error, 'getPolitenessPrompt', userId || 'anonymous'));
 
     // Log error to IPFS
     await logToIPFS({
-      error: error.message,
+      error: errorMessage,
       context: 'getPolitenessPrompt',
       userId: userId || 'anonymous',
       action: 'error',

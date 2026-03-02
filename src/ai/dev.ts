@@ -8,7 +8,7 @@
 import {config} from 'dotenv';
 import {db} from '@lib/firebase/config';
 import {formatErrorLog} from '@lib/utils';
-import {logToIPFS} from '@lib/utils';
+import {logToIPFS} from '@lib/ipfs-client';
 import {collection, addDoc} from 'firebase/firestore';
 import '@ai/flows/generate-politeness-prompt';
 

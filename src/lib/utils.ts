@@ -9,13 +9,14 @@
 // - Aligns with blueprint: OLS biofeedback (Red Sea waves) and AI politeness badges.
 // - Solo Tip: Test with `npm run dev`, trigger biofeedback via /search, check Firestore `biofeedback_events` and `logs` for buffered entries.
 'use client';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { logBiofeedbackEvent, db } from '@lib/firebase/config';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import {clsx, type ClassValue} from 'clsx';
+import {twMerge} from 'tailwind-merge';
+import {logBiofeedbackEvent, db} from '@lib/firebase/config';
+import {collection, doc, getDoc, writeBatch} from 'firebase/firestore';
+import {v4 as uuidv4} from 'uuid';
+export {logToIPFS} from '@lib/ipfs-client';
 
-let logBuffer: any[] = []; // Buffer to store logs before writing to Firestore
+let logBuffer: Array<Record<string, unknown>> = []; // Buffer to store logs before writing to Firestore
 let flushTimeout: NodeJS.Timeout | null = null; // Timeout for periodic flush
 
 /**
@@ -26,6 +27,7 @@ let flushTimeout: NodeJS.Timeout | null = null; // Timeout for periodic flush
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
 
 /**
  * Generates a unique correlation ID for tracing logs across services.
@@ -49,30 +51,13 @@ interface PolitenessScore {
  *                 If undefined, skips premium check and omits premium details.
  * @returns Promise resolving to an object with average score, badge, and message.
  */
-export async function formatPolitenessScore(score: PolitenessScore, userId?: string) {
+export function formatPolitenessScore(score: PolitenessScore, userId?: string) {
   const average = (score.ethical + score.communication + score.listener + score.topics) / 4;
   const badge = average >= 80 ? 'Gold' : average >= 60 ? 'Silver' : 'Bronze';
   let message = average >= 80 ? 'Radiant Light' : average >= 60 ? 'Growing Glow' : 'Seeking Truth';
 
-  let isPremium = false;
   if (userId && typeof userId === 'string') {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
-      if (isPremium) {
-        message += ' - Unlock detailed insights with your Premium subscription!';
-      }
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      addToLogBuffer({
-        error: errorMessage,
-        context: 'formatPolitenessScore',
-        userId: userId || 'unknown',
-        level: 'error',
-        correlationId: generateCorrelationId(),
-        timestamp: new Date()
-      });
-    }
+    message += ' - Unlock detailed insights with your Premium subscription!';
   }
 
   return {
@@ -131,11 +116,11 @@ export async function triggerBiofeedback(
     const userDoc = await getDoc(doc(db, 'users', userId));
     const soundEnabled = userDoc.exists() ? userDoc.data()?.settings?.soundEnabled !== false : true;
     if (!soundEnabled) {
-      return { success: true, message: 'Biofeedback skipped: User sound disabled' };
+      return {success: true, message: 'Biofeedback skipped: User sound disabled'};
     }
     const isPremium = userDoc.exists() && userDoc.data()?.package === 'premium';
     const finalAudioUrl = isPremium && userDoc.data()?.customAudioUrl ? userDoc.data()?.customAudioUrl : audioUrl;
-    const response = await fetch(finalAudioUrl, { method: 'HEAD' });
+    const response = await fetch(finalAudioUrl, {method: 'HEAD'});
     if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
       throw new Error('Invalid audio URL');
     }
@@ -153,7 +138,7 @@ export async function triggerBiofeedback(
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       }
     }
-    const event = { type: `audio_${type}`, value: 1, correlationId };
+    const event = {type: `audio_${type}`, value: 1, correlationId};
     await validateBiofeedbackEvent(userId, event);
     await logBiofeedbackEvent(userId, event);
     addToLogBuffer({
@@ -164,9 +149,9 @@ export async function triggerBiofeedback(
       mindfulness: `audio_${type}`,
       timestamp: new Date()
     });
-    return { success: true, message: `Biofeedback triggered: ${isPremium ? 'Custom audio' : 'Red Sea waves'}` };
+    return {success: true, message: `Biofeedback triggered: ${isPremium ? 'Custom audio' : 'Red Sea waves'}`};
   } catch (e: unknown) {
-    const errorEvent = { type: 'error', value: 0, correlationId };
+    const errorEvent = {type: 'error', value: 0, correlationId};
     await validateBiofeedbackEvent(userId, errorEvent);
     await logBiofeedbackEvent(userId, errorEvent);
     const errorMessage = e instanceof Error ? e.message : String(e);
@@ -190,7 +175,7 @@ export async function triggerBiofeedback(
  * @param correlationId - Unique ID to trace related logs.
  * @returns Formatted error log object.
  */
-export function formatErrorLog(error: unknown, context: string, userId: string, correlationId: string) {
+export function formatErrorLog(error: unknown, context: string, userId: string = 'anonymous', correlationId: string = generateCorrelationId()) {
   const errorMessage = error instanceof Error ? error.message : String(error);
   return {
     userId,
@@ -225,7 +210,7 @@ export function formatInfoLog(action: string, userId: string, correlationId: str
  * Adds a log entry to the in-memory buffer for aggregation.
  * @param log - The log object to buffer (error or info).
  */
-export function addToLogBuffer(log: any) {
+export function addToLogBuffer(log: Record<string, unknown>) {
   logBuffer.push(log);
   if (logBuffer.length >= 10) {
     flushLogBuffer();

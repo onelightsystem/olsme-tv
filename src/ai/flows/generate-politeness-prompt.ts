@@ -9,7 +9,7 @@
 import {z} from 'zod';
 import {db} from '@lib/firebase/config';
 import {formatErrorLog} from '@lib/utils';
-import {logToIPFS} from '@lib/utils';
+import {logToIPFS} from '@lib/ipfs-client';
 import {collection, addDoc} from 'firebase/firestore';
 import {getPolitenessPrompt} from '../actions';
 

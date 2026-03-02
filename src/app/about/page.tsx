@@ -52,12 +52,12 @@ export default function AboutPage() {
     const logVisit = async () => {
       try {
         const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), {
+        batch.set(doc(collection(db, 'logs')), {
           userId: user?.uid || 'anonymous',
           context: 'about_page_visit',
           timestamp: new Date(),
         });
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: user?.uid || 'anonymous',
           type: 'page_visit',
           value: 1,
@@ -85,13 +85,13 @@ export default function AboutPage() {
         });
       } catch (e: any) {
         const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), {
+        batch.set(doc(collection(db, 'logs')), {
           userId: user?.uid || 'anonymous',
           context: 'about_page_error',
           error: e.message,
           timestamp: new Date(),
         });
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: user?.uid || 'anonymous',
           type: 'error',
           value: 0,

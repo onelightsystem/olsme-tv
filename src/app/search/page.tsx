@@ -109,14 +109,14 @@ export default function SearchPage() {
 
         // Batch Firestore writes
         const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), {
+        batch.set(doc(collection(db, 'logs')), {
           userId: auth.currentUser.uid,
           context: 'user_search',
           query,
           verificationLevel,
           timestamp: new Date(),
         });
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: auth.currentUser.uid,
           type: 'search_action',
           value: 1,
@@ -142,8 +142,8 @@ export default function SearchPage() {
         });
       } catch (error: any) {
         const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), formatErrorLog(error, 'searchPage', auth.currentUser.uid));
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        batch.set(doc(collection(db, 'logs')), formatErrorLog(error, 'searchPage', auth.currentUser.uid));
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: auth.currentUser.uid,
           type: 'error',
           value: 0,

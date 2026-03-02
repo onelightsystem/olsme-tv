@@ -30,6 +30,21 @@ To run the project locally:
 - Twitter Developer API Key/Secret
 - IPFS node or Infura account
 
+### Environment (IPFS)
+
+If you use Infura for IPFS uploads, set one of the following in `.env.local`:
+
+- `NEXT_PUBLIC_IPFS_AUTH_HEADER` (full auth header, e.g. `Basic ...`)
+- or both:
+  - `NEXT_PUBLIC_IPFS_INFURA_PROJECT_ID`
+  - `NEXT_PUBLIC_IPFS_INFURA_PROJECT_SECRET`
+
+Optional:
+
+- `NEXT_PUBLIC_IPFS_URL` (defaults to `https://ipfs.infura.io:5001`)
+
+Without auth on an Infura URL, IPFS uploads are skipped and the app falls back to Firestore logs.
+
 ## Testing
 - Run `npm run dev`, visit `http://localhost:9002`.
 - Test login via Profile/Phone in `Header`, verify Firestore `users`.
