@@ -204,6 +204,7 @@ async function toastPolitenessScore({
     const toastProps = {
       title: `Politeness: ${badge}`,
       description: enhancedMessage,
+      action: badge === 'Bronze' ? {label: 'Improve', onClick: () => window.location.href = '/tips'} : undefined,
       'aria-live': 'polite' as const, // Accessibility
     };
 
