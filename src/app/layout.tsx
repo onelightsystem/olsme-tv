@@ -19,7 +19,7 @@ import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { debounce } from 'lodash';
@@ -33,6 +33,10 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
     try {
       return await operation();
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('write batch can no longer be used after commit')) {
+        throw e;
+      }
       attempts++;
       if (attempts === maxAttempts) throw e;
       await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
@@ -48,12 +52,27 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   useEffect(() => {
     const functions = getFunctions();
     const updateUserStatus = httpsCallable(functions, 'updateUserStatus');
+    let statusUpdatesDisabled = false;
+    let warnedStatusDisabled = false;
     // Debounce status updates to reduce Cloud Function calls
     const debouncedUpdateStatus = debounce(async (status: string) => {
-      if (auth.currentUser) {
+      if (auth.currentUser && !statusUpdatesDisabled) {
         try {
           await updateUserStatus({ status });
         } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          const shouldDisable =
+            message.includes('404') ||
+            message.toLowerCase().includes('cors') ||
+            message.toLowerCase().includes('not-found');
+          if (shouldDisable) {
+            statusUpdatesDisabled = true;
+            if (!warnedStatusDisabled) {
+              warnedStatusDisabled = true;
+              console.warn('updateUserStatus callable unavailable; status syncing disabled for this session.');
+            }
+            return;
+          }
           console.error('Status update failed:', e);
         }
       }
@@ -100,12 +119,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             timestamp: new Date().toISOString(),
           });
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
         const batch = writeBatch(db); // Fresh batch
         batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'layoutAuth', u?.uid || 'anonymous'));
-        await withFirestoreRetry(() => batch.commit());
+        try {
+          await withFirestoreRetry(() => batch.commit());
+        } catch {
+          console.warn('Skipping layoutAuth log write due to Firestore permissions or transient write error.');
+        }
         await logToIPFS({
-          error: e.message,
+          error: errorMessage,
           context: 'layoutAuth',
           userId: u?.uid || 'anonymous',
           action: 'error',
@@ -131,7 +155,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={ptSans.className} suppressHydrationWarning>
       <head>
         <title>{metadata.title?.toString()}</title>
-        <meta name="description" content={metadata.description} />
+        <meta name="description" content={metadata.description?.toString() ?? ''} />
       </head>
       <body
         className={cn(

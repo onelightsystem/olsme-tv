@@ -1,6 +1,6 @@
 {
   "name": "olsme-tv",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -10,7 +10,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src functions/src --fix",
-    "typecheck": "tsc --noEmit && tsc --noEmit --project functions/tsconfig.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit --project functions/tsconfig.json",
+    "check:lint": "eslint src",
+    "check:lint:functions": "npm --prefix functions run lint",
+    "check:types": "tsc --noEmit -p tsconfig.json",
+    "check:types:functions": "tsc --noEmit --project functions/tsconfig.json",
+    "check:security": "npm audit --audit-level=high",
+    "check": "npm run check:lint && npm run check:types && npm run check:security",
+    "precommit": "npm run check"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -46,10 +53,10 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.10.0",
     "genkit": "^1.14.1",
-    "ipfs-http-client": "^59.0.0",
+    "kubo-rpc-client": "^6.1.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
-    "next": "15.5.3",
+    "next": "^15.5.12",
     "node-fetch": "^2.6.7",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -67,7 +74,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^10.0.0",
-    "@types/webpack": "^5.28.5",
     "@typescript-eslint/eslint-plugin": "^8.45.0",
     "@typescript-eslint/parser": "^8.45.0",
     "eslint": "^9.36.0",

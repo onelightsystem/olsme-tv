@@ -7,23 +7,12 @@
 // - Added Firestore logging for solo progress tracking.
 // - Improved error handling for prototype testing.
 import * as functions from "firebase-functions/v2";
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import {CallableRequest} from "firebase-functions/v2/https";
-import cors from "cors";
+import {CallableRequest, onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 
 admin.initializeApp();
 const db = admin.firestore();
-
-const corsHandler = cors({
-  origin: [
-    "http://localhost:9002",
-    "https://studio-4615914296-4bd91.web.app",
-    "https://olsme.tv",
-    /^https:\/\/[a-z0-9-]+\.olsme\.tv$/
-  ],
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-});
 
 const ADMIN_EMAIL = "info@olsme.com";
 
@@ -36,19 +25,20 @@ const setAdminClaim = async (user: admin.auth.UserRecord) => {
   return false;
 };
 
-export const onUserCreate = functions.auth.user().onCreate(async (user) => {
+export const onUserCreate = functionsV1.auth.user().onCreate(async (user) => {
   await setAdminClaim(user);
 });
 
-export const upgradeToPremium = functions.https.onCall(async (data: unknown, context: CallableRequest<unknown>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
-  const uid = context.auth.uid;
+  const uid = auth.uid;
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    await admin.auth().setCustomUserClaims(uid, {...context.auth.token, isPremium: true});
+    await admin.auth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
       userId: uid,
@@ -58,22 +48,23 @@ export const upgradeToPremium = functions.https.onCall(async (data: unknown, con
     return {success: true, message: "Successfully upgraded to premium."};
   } catch (error) {
     functions.logger.error(`Error upgrading user ${uid} to premium:`, error);
-    throw new functions.https.HttpsError("internal", "An error occurred while upgrading the account.");
+    throw new HttpsError("internal", "An error occurred while upgrading the account.");
   }
 });
 
-export const setPolitenessClaim = functions.https.onCall(async (data: unknown, context: CallableRequest<unknown>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+export const setPolitenessClaim = onCall(async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
   }
-  const uid = context.auth.uid;
+  const uid = auth.uid;
   const userDoc = await db.collection("users").doc(uid).get();
   if (!userDoc.exists) {
-    throw new functions.https.HttpsError("not-found", "User not found.");
+    throw new HttpsError("not-found", "User not found.");
   }
   const userData = userDoc.data();
   if (!userData) {
-    throw new functions.https.HttpsError("internal", "User data is missing.");
+    throw new HttpsError("internal", "User data is missing.");
   }
   const score = userData.politenessScore || {ethical: 0, communication: 0, listener: 0, topics: 0};
   const sentimentScore = await analyzeSentiment(userData.recentChats || []);
@@ -104,11 +95,18 @@ export const setPolitenessClaim = functions.https.onCall(async (data: unknown, c
     return {success: true, politenessLevel, verificationLevel, decentralizedId};
   } catch (error) {
     functions.logger.error(`Error setting claims for user ${uid}:`, error);
-    throw new functions.https.HttpsError("internal", "An error occurred while setting custom claims.");
+    throw new HttpsError("internal", "An error occurred while setting custom claims.");
   }
 });
 
-export const matchUsers = functions.https.onRequest({cors: corsHandler}, async (req, res) => {
+export const matchUsers = onRequest({
+  cors: [
+    "http://localhost:9002",
+    "https://studio-4615914296-4bd91.web.app",
+    "https://olsme.tv",
+    /^https:\/\/[a-z0-9-]+\.olsme\.tv$/
+  ]
+}, async (_req, res): Promise<void> => {
   try {
     const users = await db
       .collection("users")
@@ -126,20 +124,24 @@ export const matchUsers = functions.https.onRequest({cors: corsHandler}, async (
       resultsCount: matchedUsers.length,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
-    return res.status(200).json({matchedUsers});
+    res.status(200).json({matchedUsers});
+    return;
   } catch (error) {
     functions.logger.error("Error matching users", {error});
-    return res.status(500).json({error: "Internal server error"});
+    res.status(500).json({error: "Internal server error"});
+    return;
   }
 });
 
-export const searchUsers = functions.https.onCall(async (data: { query?: string; verificationLevel?: string }, context: CallableRequest<{ query?: string; verificationLevel?: string }>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "You must be logged in to search for users.");
+export const searchUsers = onCall(async (request: CallableRequest<{ query?: string; verificationLevel?: string }>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to search for users.");
   }
+  const data = request.data || {};
   const {query, verificationLevel} = data;
   const normalizedQuery = (query || "").trim().toLowerCase();
-  let userQuery = db.collection("users");
+  let userQuery: FirebaseFirestore.Query = db.collection("users");
   if (normalizedQuery) {
     userQuery = userQuery
       .where("displayName_lowercase", ">=", normalizedQuery)
@@ -154,13 +156,13 @@ export const searchUsers = functions.https.onCall(async (data: { query?: string;
   try {
     const snapshot = await userQuery.limit(20).get();
     const users = snapshot.docs
-      .map(doc => {
-        const {uid, displayName, package: userPackage, verificationLevel: userVerificationLevel} = doc.data();
+      .map((document) => {
+        const {uid, displayName, package: userPackage, verificationLevel: userVerificationLevel} = document.data();
         return {uid, displayName, package: userPackage, verificationLevel: userVerificationLevel};
       })
-      .filter(user => user.uid !== context.auth?.uid);
+      .filter(user => user.uid !== auth.uid);
     await db.collection("logs").add({
-      userId: context.auth.uid,
+      userId: auth.uid,
       action: "searchUsers",
       query: data,
       resultsCount: users.length,
@@ -169,18 +171,20 @@ export const searchUsers = functions.https.onCall(async (data: { query?: string;
     return {users};
   } catch (error) {
     functions.logger.error("Error searching users:", error);
-    throw new functions.https.HttpsError("internal", "An error occurred while searching for users.");
+    throw new HttpsError("internal", "An error occurred while searching for users.");
   }
 });
 
-export const updateUserStatus = functions.https.onCall(async (data: { status: string }, context: CallableRequest<{ status: string }>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+export const updateUserStatus = onCall(async (request: CallableRequest<{ status: string }>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
+  const data = request.data ?? {};
   const {status} = data;
-  const uid = context.auth.uid;
-  if (!["online", "offline"].includes(status)) {
-    throw new functions.https.HttpsError("invalid-argument", "Status must be 'online' or 'offline'.");
+  const uid = auth.uid;
+  if (typeof status !== "string" || !["online", "offline"].includes(status)) {
+    throw new HttpsError("invalid-argument", "Status must be 'online' or 'offline'.");
   }
   const userStatusRef = db.collection("user_status").doc(uid);
   try {
@@ -197,13 +201,23 @@ export const updateUserStatus = functions.https.onCall(async (data: { status: st
     return {success: true};
   } catch (error) {
     functions.logger.error(`Failed to update status for user ${uid}`, error);
-    throw new functions.https.HttpsError("internal", "Could not update user status.");
+    throw new HttpsError("internal", "Could not update user status.");
   }
 });
 
-export const sendAdminEmail = functions.https.onCall(async (data: { userId: string; displayName: string; email: string }, context: CallableRequest<{ userId: string; displayName: string; email: string }>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+export const sendAdminEmail = onCall(async (request: CallableRequest<{ userId: string; displayName: string; email: string }>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
+  }
+  const data = request.data;
+  if (
+    !data ||
+    typeof data.userId !== "string" || data.userId.trim().length === 0 ||
+    typeof data.displayName !== "string" || data.displayName.trim().length === 0 ||
+    typeof data.email !== "string" || data.email.trim().length === 0
+  ) {
+    throw new HttpsError("invalid-argument", "Missing or invalid required fields: userId, displayName, email.");
   }
   const {userId, displayName, email} = data;
   const logMessage = {
@@ -217,7 +231,7 @@ export const sendAdminEmail = functions.https.onCall(async (data: { userId: stri
     await db.collection("mail").add(logMessage);
     functions.logger.info(`Simulated email for KYC request for user ${userId}.`);
     await db.collection("logs").add({
-      userId: context.auth.uid,
+      userId: auth.uid,
       action: "sendAdminEmail",
       details: `KYC request for ${userId}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -225,31 +239,32 @@ export const sendAdminEmail = functions.https.onCall(async (data: { userId: stri
     return {success: true, message: "Verification request sent."};
   } catch (error) {
     functions.logger.error(`Failed to send admin email for user ${userId}`, error);
-    throw new functions.https.HttpsError("internal", "Could not process the verification request.");
+    throw new HttpsError("internal", "Could not process the verification request.");
   }
 });
 
-export const getAllUsers = functions.https.onCall(async (data: unknown, context: CallableRequest<unknown>) => {
-  if (!context.auth?.token.isAdmin) {
-    throw new functions.https.HttpsError("permission-denied", "Must be an admin to access user data.");
+export const getAllUsers = onCall(async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth?.token.isAdmin) {
+    throw new HttpsError("permission-denied", "Must be an admin to access user data.");
   }
   try {
     const [usersSnapshot, statusSnapshot] = await Promise.all([
       db.collection("users").get(),
       db.collection("user_status").where("status", "==", "online").get()
     ]);
-    const onlineUsers = new Set(statusSnapshot.docs.map(doc => doc.id));
-    const users = usersSnapshot.docs.map(doc => {
-      const userData = doc.data();
+    const onlineUsers = new Set(statusSnapshot.docs.map((document) => document.id));
+    const users = usersSnapshot.docs.map((document) => {
+      const userData = document.data();
       const createdAt = userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null;
       return {
         ...userData,
         createdAt,
-        status: onlineUsers.has(doc.id) ? "online" : "offline"
+        status: onlineUsers.has(document.id) ? "online" : "offline"
       };
     });
     await db.collection("logs").add({
-      userId: context.auth.uid,
+      userId: auth.uid,
       action: "getAllUsers",
       resultsCount: users.length,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -257,27 +272,38 @@ export const getAllUsers = functions.https.onCall(async (data: unknown, context:
     return {users};
   } catch (error) {
     functions.logger.error("Error fetching all users:", error);
-    throw new functions.https.HttpsError("internal", "Failed to fetch users.");
+    throw new HttpsError("internal", "Failed to fetch users.");
   }
 });
 
-export const rateGuest = functions.https.onCall(async (data: { guestId: string; rating: string }, context: CallableRequest<{ guestId: string; rating: string }>) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+export const rateGuest = onCall(async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
-  const {guestId, rating} = data;
-  if (!guestId || !["good", "bad"].includes(rating)) {
-    throw new functions.https.HttpsError("invalid-argument", "Invalid guest ID or rating.");
+  const data = request.data;
+  if (data === null || data === undefined || typeof data !== "object") {
+    throw new HttpsError("invalid-argument", "Invalid guest ID or rating.");
   }
+  const payload = data as Record<string, unknown>;
+  if (
+    typeof payload.guestId !== "string" ||
+    !payload.guestId ||
+    typeof payload.rating !== "string" ||
+    !["good", "bad"].includes(payload.rating)
+  ) {
+    throw new HttpsError("invalid-argument", "Invalid guest ID or rating.");
+  }
+  const {guestId, rating} = payload as { guestId: string; rating: string };
   try {
     await admin.firestore().collection("ratings").add({
-      userId: context.auth.uid,
+      userId: auth.uid,
       guestId,
       rating,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
     await db.collection("logs").add({
-      userId: context.auth.uid,
+      userId: auth.uid,
       action: "rateGuest",
       details: {guestId, rating},
       timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -285,8 +311,8 @@ export const rateGuest = functions.https.onCall(async (data: { guestId: string; 
     return {success: true};
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    functions.logger.error(`Error rating guest ${guestId} by user ${context.auth.uid}:`, error);
-    throw new functions.https.HttpsError("internal", `Could not process rating: ${errorMessage}`);
+    functions.logger.error(`Error rating guest ${guestId} by user ${auth.uid}:`, error);
+    throw new HttpsError("internal", `Could not process rating: ${errorMessage}`);
   }
 });
 

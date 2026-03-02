@@ -106,7 +106,7 @@ export async function validateImageUrl(url: string, userId: string = 'anonymous'
     const finalUrl = isPremium ? 'https://olsme.com/assets/premium-image.jpg' : url;
 
     const response = await fetch(finalUrl, {method: 'HEAD'});
-    const isValid = response.ok && response.headers.get('content-type')?.startsWith('image/');
+    const isValid = response.ok && !!response.headers.get('content-type')?.startsWith('image/');
     if (!isValid) {
       const batch = writeBatch(db);
       batch.set(doc(collection(db, 'logs')), {

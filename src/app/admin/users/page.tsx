@@ -94,12 +94,12 @@ export default function AdminUsersPage() {
           setIsAdmin(true);
           try {
             const batch = writeBatch(db);
-            batch.set(collection(db, 'logs').doc(), {
+            batch.set(doc(collection(db, 'logs')), {
               userId: user.uid,
               context: 'admin_dashboard_access',
               timestamp: new Date(),
             });
-            batch.set(collection(db, 'biofeedback_events').doc(), {
+            batch.set(doc(collection(db, 'biofeedback_events')), {
               userId: user.uid,
               type: 'admin_access',
               value: 1,
@@ -120,8 +120,8 @@ export default function AdminUsersPage() {
             }
           } catch (e: any) {
             const batch = writeBatch(db);
-            batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'admin_dashboard_access', user.uid));
-            batch.set(collection(db, 'biofeedback_events').doc(), {
+            batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'admin_dashboard_access', user.uid));
+            batch.set(doc(collection(db, 'biofeedback_events')), {
               userId: user.uid,
               type: 'error',
               value: 0,
@@ -161,8 +161,8 @@ export default function AdminUsersPage() {
         })
         .catch((error: any) => {
           const batch = writeBatch(db);
-          batch.set(collection(db, 'logs').doc(), formatErrorLog(error, 'getAllUsers', adminUser?.uid || 'anonymous'));
-          batch.set(collection(db, 'biofeedback_events').doc(), {
+          batch.set(doc(collection(db, 'logs')), formatErrorLog(error, 'getAllUsers', adminUser?.uid || 'anonymous'));
+          batch.set(doc(collection(db, 'biofeedback_events')), {
             userId: adminUser?.uid || 'anonymous',
             type: 'error',
             value: 0,

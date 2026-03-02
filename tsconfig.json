@@ -7,7 +7,6 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./lib",
-    "rootDir": "./src",
     "sourceMap": true,
     "types": [
       "node"

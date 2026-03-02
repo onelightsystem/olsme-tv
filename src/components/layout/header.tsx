@@ -212,7 +212,7 @@ export default function Header() {
               <span className="mx-2" />
             <Link href="/about" className="flex items-center">
           
-              <span className="font-bold font-headline">olsme Chat beta 0.2</span>
+              <span className="font-bold font-headline">olsme Chat beta 0.3</span>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end gap-2">

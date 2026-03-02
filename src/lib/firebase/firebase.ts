@@ -25,7 +25,7 @@ import {formatErrorLog, generateCorrelationId} from '@lib/utils';
 import {auth, db} from './config';
 
 // Retry logic for Firestore writes
-async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
+async function withFirestoreRetry<T>(operation: () => T | Promise<T>, maxAttempts: number = 3): Promise<T> {
   let attempts = 0;
   while (attempts < maxAttempts) {
     try {
@@ -209,22 +209,23 @@ export async function logBiofeedbackEvent(userId: string, event: { type: string;
 }
 
 // Request KYC verification
-export async function requestKYCVerification() {
-  if (!auth.currentUser) throw new Error("User not authenticated");
+export async function requestKYCVerification(userId?: string) {
+  if (!auth.currentUser) throw new Error('User not authenticated');
   const correlationId = generateCorrelationId();
   try {
     const functions = getFunctions();
     const sendAdminEmail = httpsCallable(functions, 'sendAdminEmail');
-    const response: any = await sendAdminEmail({
-      userId: auth.currentUser.uid,
+    const response = await sendAdminEmail({
+      userId: userId || auth.currentUser.uid,
       displayName: auth.currentUser.displayName,
       email: auth.currentUser.email,
     });
-    if (response.data.success) {
+    const responseData = response.data as {success?: boolean; message?: string};
+    if (responseData.success) {
       const {logToIPFS} = await import('@lib/ipfs-client');
       await logToIPFS({userId: auth.currentUser.uid, action: 'request_kyc', correlationId});
     } else {
-      throw new Error(response.data.message || 'Failed to send verification request.');
+      throw new Error(responseData.message || 'Failed to send verification request.');
     }
   } catch (error) {
     if (error instanceof Error) {
