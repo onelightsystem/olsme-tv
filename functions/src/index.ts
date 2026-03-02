@@ -211,6 +211,14 @@ export const sendAdminEmail = onCall(async (request: CallableRequest<{ userId: s
     throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
   const data = request.data;
+  if (
+    !data ||
+    typeof data.userId !== "string" || data.userId.trim().length === 0 ||
+    typeof data.displayName !== "string" || data.displayName.trim().length === 0 ||
+    typeof data.email !== "string" || data.email.trim().length === 0
+  ) {
+    throw new HttpsError("invalid-argument", "Missing or invalid required fields: userId, displayName, email.");
+  }
   const {userId, displayName, email} = data;
   const logMessage = {
     to: ADMIN_EMAIL,
