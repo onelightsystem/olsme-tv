@@ -51,60 +51,49 @@ export async function logToIPFS(data: IPFSLogData) {
     const userId = data.userId || 'anonymous';
     const action = data.action || 'unspecified';
 
-    const ipfsUrl = process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001';
-    const isInfura = /infura\.io/.test(ipfsUrl);
-    const authHeaderFromEnv = process.env.NEXT_PUBLIC_IPFS_AUTH_HEADER?.trim();
-    const infuraProjectId = process.env.NEXT_PUBLIC_IPFS_INFURA_PROJECT_ID?.trim();
-    const infuraProjectSecret = process.env.NEXT_PUBLIC_IPFS_INFURA_PROJECT_SECRET?.trim();
-
-    let authorization = authHeaderFromEnv;
-    if (!authorization && infuraProjectId && infuraProjectSecret && typeof window !== 'undefined') {
-      authorization = `Basic ${window.btoa(`${infuraProjectId}:${infuraProjectSecret}`)}`;
-    }
-
-    if (isInfura && !authorization) {
-      if (!warnedMissingInfuraAuth) {
-        warnedMissingInfuraAuth = true;
-        console.warn('IPFS logging disabled: Infura endpoint requires auth. Set NEXT_PUBLIC_IPFS_AUTH_HEADER or Infura project credentials.');
-      }
-      await safeAddLog({
-        userId,
-        action,
-        context: 'ipfs_skipped_no_auth',
-        correlationId,
-        timestamp: new Date().toISOString()
-      });
-      return null;
-    }
-
-    const {create} = await import('kubo-rpc-client');
-    const ipfs = create({
-      url: ipfsUrl,
-      headers: authorization ? {authorization} : undefined
-    });
+    let cid: string | null = null;
     let attempts = 0;
     const maxAttempts = 3;
-    let cid: string | null = null;
     while (attempts < maxAttempts) {
       try {
-        const result = await ipfs.add(JSON.stringify({...data, timestamp: new Date().toISOString(), correlationId}));
-        cid = result.cid.toString();
-        break;
-      } catch (err: unknown) {
-        const errMessage = err instanceof Error ? err.message : String(err);
-        const isUnauthorized = errMessage.includes('401') || errMessage.toLowerCase().includes('unauthorized');
-        if (isUnauthorized) {
-          console.warn('IPFS upload unauthorized; skipping upload and using Firestore fallback.');
+        const response = await fetch('/api/ipfs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({...data, correlationId})
+        });
+        if (response.status === 503) {
+          if (!warnedMissingInfuraAuth) {
+            warnedMissingInfuraAuth = true;
+            console.warn('IPFS logging disabled: server-side IPFS auth not configured.');
+          }
           await safeAddLog({
             userId,
             action,
-            context: 'ipfs_unauthorized',
-            error: errMessage,
+            context: 'ipfs_skipped_no_auth',
             correlationId,
             timestamp: new Date().toISOString()
           });
           return null;
         }
+        if (response.status === 401 || response.status === 403) {
+          console.warn('IPFS upload unauthorized; skipping upload and using Firestore fallback.');
+          await safeAddLog({
+            userId,
+            action,
+            context: 'ipfs_unauthorized',
+            correlationId,
+            timestamp: new Date().toISOString()
+          });
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error(`IPFS API responded with status ${response.status}`);
+        }
+        const json = await response.json() as {cid?: string; error?: string};
+        cid = json.cid ?? null;
+        break;
+      } catch (err: unknown) {
+        const errMessage = err instanceof Error ? err.message : String(err);
         attempts++;
         if (attempts === maxAttempts) {
           console.warn('IPFS upload failed, falling back to local Firestore');
@@ -112,7 +101,7 @@ export async function logToIPFS(data: IPFSLogData) {
             userId,
             action,
             context: 'ipfs_fallback',
-            error: 'IPFS upload failed',
+            error: errMessage,
             correlationId,
             timestamp: new Date().toISOString()
           });
