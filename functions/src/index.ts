@@ -276,16 +276,25 @@ export const getAllUsers = onCall(async (request: CallableRequest<unknown>) => {
   }
 });
 
-export const rateGuest = onCall(async (request: CallableRequest<{ guestId: string; rating: string }>) => {
+export const rateGuest = onCall(async (request: CallableRequest<unknown>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
   const data = request.data;
-  const {guestId, rating} = data;
-  if (!guestId || !["good", "bad"].includes(rating)) {
+  if (data === null || data === undefined || typeof data !== "object") {
     throw new HttpsError("invalid-argument", "Invalid guest ID or rating.");
   }
+  const payload = data as Record<string, unknown>;
+  if (
+    typeof payload.guestId !== "string" ||
+    !payload.guestId ||
+    typeof payload.rating !== "string" ||
+    !["good", "bad"].includes(payload.rating)
+  ) {
+    throw new HttpsError("invalid-argument", "Invalid guest ID or rating.");
+  }
+  const {guestId, rating} = payload as { guestId: string; rating: string };
   try {
     await admin.firestore().collection("ratings").add({
       userId: auth.uid,
