@@ -14,8 +14,6 @@ import {twMerge} from 'tailwind-merge';
 import {logBiofeedbackEvent, db} from '@lib/firebase/config';
 import {collection, doc, getDoc, writeBatch} from 'firebase/firestore';
 import {v4 as uuidv4} from 'uuid';
-export {logToIPFS} from '@lib/ipfs-client';
-
 let logBuffer: Array<Record<string, unknown>> = []; // Buffer to store logs before writing to Firestore
 let flushTimeout: NodeJS.Timeout | null = null; // Timeout for periodic flush
 
