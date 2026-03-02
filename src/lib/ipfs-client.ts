@@ -101,7 +101,7 @@ export async function logToIPFS(data: IPFSLogData) {
             userId,
             action,
             context: 'ipfs_fallback',
-            error: 'IPFS upload failed',
+            error: errMessage,
             correlationId,
             timestamp: new Date().toISOString()
           });
