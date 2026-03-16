@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Sparkles, X } from 'lucide-react';
@@ -24,11 +24,29 @@ export default function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const router = useRouter();
   const [mindfulMode, setMindfulMode] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSignIn = async () => {
+  useEffect(() => {
+    if (!open) {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      setIsConnecting(false);
+    }
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [open]);
+
+  const handleSignIn = () => {
     setIsConnecting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    router.push('/profile');
+    timerRef.current = setTimeout(() => {
+      router.push('/profile');
+    }, 1400);
   };
 
   return (
