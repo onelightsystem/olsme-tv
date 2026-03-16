@@ -9,9 +9,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)
   },
-  eslint: {
-    ignoreDuringBuilds: true, // Solo efficiency
-  },
   images: {
     unoptimized: true, // Prototype phase
     remotePatterns: [
@@ -30,7 +27,8 @@ const nextConfig = {
     FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
     NEXT_PUBLIC_IPFS_URL: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001',
   },
-  webpack: (config: import('webpack').Configuration) => {
+  webpack: (config: { resolve?: { fallback?: Record<string, boolean> } }) => {
+    config.resolve = config.resolve ?? {};
     config.resolve.fallback = {
       ...config.resolve.fallback,
       electron: false,

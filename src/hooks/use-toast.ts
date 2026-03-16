@@ -10,6 +10,7 @@
 'use client';
 import * as React from 'react';
 import type {ToastActionElement, ToastProps} from '@components/ui/toast';
+import {ToastAction} from '@components/ui/toast';
 import {formatPolitenessScore, generateCorrelationId, formatErrorLog} from '@lib/utils';
 import {logToIPFS} from '@lib/ipfs-client';
 import {db, auth} from '@lib/firebase/config';
@@ -204,7 +205,16 @@ async function toastPolitenessScore({
     const toastProps = {
       title: `Politeness: ${badge}`,
       description: enhancedMessage,
-      action: badge === 'Bronze' ? {label: 'Improve', onClick: () => window.location.href = '/tips'} : undefined,
+      action: badge === 'Bronze' ? React.createElement(
+        ToastAction,
+        {
+          altText: 'Improve politeness tips',
+          onClick: () => {
+            window.location.href = '/tips';
+          },
+        },
+        'Improve'
+      ) : undefined,
       'aria-live': 'polite' as const, // Accessibility
     };
 

@@ -9,7 +9,7 @@
 // - Solo Tip: Test with `npm run dev`, visit `/`, check Firestore `ratings`/`logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { auth, db } from '@lib/firebase/config';
 import { useToast } from '@hooks/use-toast';
 import { logToIPFS } from '@lib/ipfs-client';
@@ -19,11 +19,11 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
 import { Button } from '@components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@components/ui/dialog';
 import { Sun, User, ThumbsUp, ThumbsDown, MessageSquare, ShieldCheck, ArrowRight, StopCircle, Gem } from 'lucide-react';
 import { cn } from '@lib/utils';
 import ChatPanel from '@components/chat/chat-panel';
 import { Alert, AlertTitle, AlertDescription } from '@components/ui/alert';
+import LoginModal from '@components/chat/login-modal';
 
 interface Guest {
   uid: string;
@@ -31,6 +31,23 @@ interface Guest {
   package: 'free' | 'premium';
   verificationLevel: 'level1' | 'level2' | 'level3';
 }
+
+const LOGIN_DUST_PARTICLES = [
+  { left: '8%', top: '14%', size: 4, duration: 22, delay: 0 },
+  { left: '18%', top: '72%', size: 6, duration: 30, delay: 3 },
+  { left: '26%', top: '36%', size: 3, duration: 24, delay: 1 },
+  { left: '34%', top: '22%', size: 5, duration: 28, delay: 5 },
+  { left: '42%', top: '68%', size: 4, duration: 26, delay: 2 },
+  { left: '50%', top: '44%', size: 6, duration: 32, delay: 8 },
+  { left: '58%', top: '18%', size: 3, duration: 20, delay: 2 },
+  { left: '64%', top: '78%', size: 5, duration: 27, delay: 6 },
+  { left: '72%', top: '34%', size: 4, duration: 25, delay: 9 },
+  { left: '80%', top: '62%', size: 6, duration: 31, delay: 4 },
+  { left: '88%', top: '24%', size: 4, duration: 23, delay: 7 },
+  { left: '14%', top: '50%', size: 5, duration: 29, delay: 10 },
+  { left: '46%', top: '12%', size: 3, duration: 21, delay: 1 },
+  { left: '66%', top: '52%', size: 4, duration: 24, delay: 11 },
+];
 
 // Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
@@ -273,17 +290,53 @@ export default function HomePage() {
 
   if (!user) {
     return (
-      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Login to Begin Random Video Awaken Chat</DialogTitle>
-            <DialogDescription>Sign in to start your mindful chat experience.</DialogDescription>
-          </DialogHeader>
-          <Button asChild>
-            <Link href="/profile">Sign In / Sign Up</Link>
-          </Button>
-        </DialogContent>
-      </Dialog>
+      <main className="relative min-h-screen overflow-hidden bg-[#0A0A0A] text-white">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            background:
+              'radial-gradient(circle at 15% 20%, rgba(255, 215, 0, 0.06), transparent 40%), radial-gradient(circle at 80% 70%, rgba(255, 170, 0, 0.04), transparent 45%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          {LOGIN_DUST_PARTICLES.map((particle, index) => (
+            <motion.span
+              key={`gold-dust-${index}`}
+              className="absolute rounded-full bg-[#FFD700]"
+              style={{
+                left: particle.left,
+                top: particle.top,
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+              }}
+              animate={{
+                y: [0, -24, 0],
+                x: [0, 8, -6, 0],
+                opacity: [0.04, 0.16, 0.04],
+              }}
+              transition={{
+                duration: particle.duration,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: particle.delay,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="absolute left-4 top-4 z-20 flex items-center gap-3 rounded-full border border-[#FFD700]/20 bg-black/30 px-4 py-2 backdrop-blur-md sm:left-6 sm:top-6">
+          <span className="rounded-full bg-[#FFD700]/10 p-2 shadow-[0_0_28px_rgba(255,215,0,0.38)]">
+            <Sun className="h-6 w-6 text-[#FFD700] sm:h-7 sm:w-7" aria-hidden="true" />
+          </span>
+          <span className="text-base font-semibold tracking-wide text-[#FFE7A0] sm:text-lg">olsme.tv</span>
+        </div>
+
+        <div className="relative z-10 flex min-h-screen items-center justify-center p-4 sm:p-8">
+          <LoginModal open={loginOpen} onOpenChange={setLoginOpen} />
+        </div>
+      </main>
     );
   }
 
