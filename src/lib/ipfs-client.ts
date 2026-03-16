@@ -94,6 +94,7 @@ export async function logToIPFS(data: IPFSLogData) {
         cid = json.cid ?? null;
         break;
       } catch (err: unknown) {
+        const errMessage = err instanceof Error ? err.message : String(err);
         attempts++;
         if (attempts === maxAttempts) {
           console.warn('IPFS upload failed, falling back to local Firestore');

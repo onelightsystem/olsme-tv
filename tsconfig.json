@@ -29,10 +29,18 @@
     ],
     "baseUrl": "./src",
     "paths": {
-      "@components/*": ["components/*"],
-      "@hooks/*": ["hooks/*"],
-      "@lib/*": ["lib/*"],
-      "@ai/*": ["ai/*"]
+      "@components/*": [
+        "components/*"
+      ],
+      "@hooks/*": [
+        "hooks/*"
+      ],
+      "@lib/*": [
+        "lib/*"
+      ],
+      "@ai/*": [
+        "ai/*"
+      ]
     }
   },
   "include": [
