@@ -11,6 +11,7 @@
 
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { auth, db, requestKYCVerification } from '@lib/firebase/config';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
@@ -27,7 +28,7 @@ type UserProfile = {
   uid: string;
   displayName: string;
   email: string;
-  package: 'free' | 'premium';
+  package: 'free' | 'premium' | 'starter';
   verificationLevel: 'level1' | 'level2' | 'level3';
   politenessScore: {
     ethical: number;
@@ -39,6 +40,8 @@ type UserProfile = {
   createdAt: any;
   location: string;
   age: number;
+  status?: string;
+  subscriptionStatus?: string;
 };
 
 const verificationLevelText = {
@@ -148,9 +151,18 @@ export default function ProfilePage() {
   }
 
   const { average, badge, message } = formatPolitenessScore(profile.politenessScore);
+  const hasActiveSubscription = profile.status === 'active' || profile.subscriptionStatus === 'active' || profile.package === 'premium';
 
   return (
     <div className="container mx-auto p-4 max-w-2xl">
+      {!hasActiveSubscription && (
+        <div className="mb-4 rounded-xl border border-[#FFD700]/30 bg-[rgba(17,17,17,0.82)] p-4 text-[#FFE7A0] backdrop-blur-md">
+          <p className="text-sm font-semibold">Upgrade to unlock unlimited mindful chats.</p>
+          <Link href="/subscribe" className="mt-2 inline-block text-sm font-bold text-[#FFD700] underline-offset-4 hover:underline">
+            Go to Subscribe
+          </Link>
+        </div>
+      )}
       <Card className="shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center">
           <Sun className="mx-auto h-12 w-12 text-primary mb-4" />

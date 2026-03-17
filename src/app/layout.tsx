@@ -12,7 +12,7 @@ import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@lib/utils';
 import { Toaster } from '@components/ui/toaster';
-import Header from '@components/layout/header';
+import Header from '@components/Header';
 import { auth, db } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
@@ -166,7 +166,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       >
         <div className="relative flex min-h-screen flex-col">
           <Header />
-          <main className="flex-1" role="main">
+          <main className="flex-1 pt-16" role="main">
             {children}
           </main>
         </div>

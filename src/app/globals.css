@@ -170,4 +170,14 @@
   .sun-rise-loop {
     animation: sun-rise 2.4s ease-in-out infinite;
   }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.08; }
+    50% { opacity: 0.28; }
+  }
+
+  .star-twinkle {
+    animation: twinkle var(--twinkle-duration, 10s) ease-in-out infinite;
+    animation-delay: var(--twinkle-delay, 0s);
+  }
 }

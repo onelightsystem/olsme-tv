@@ -12,9 +12,11 @@
 // - Solo Tip: Test with `npm run dev`, mock WebRTC stream, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@components/ui/card';
-import { VideoOff, MicOff, Gem } from 'lucide-react';
+import { VideoOff, MicOff, Gem, Lock } from 'lucide-react';
 import { Badge } from '@components/ui/badge';
+import { Button } from '@components/ui/button';
 import { useToast } from '@hooks/use-toast';
 import { db, auth } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
@@ -22,6 +24,7 @@ import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
 import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { cn } from '@lib/utils';
+import { getUserSubscriptionStatus } from '@lib/subscription';
 
 type VideoPlayerProps = {
   isLocal: boolean;
@@ -46,8 +49,10 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, stream }: VideoPlayerProps) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [subscriptionActive, setSubscriptionActive] = useState(false);
   const { toast } = useToast();
   const user = auth.currentUser;
 
@@ -57,6 +62,16 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
         setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
       });
+
+      getUserSubscriptionStatus(user.uid)
+        .then((subscription) => {
+          setSubscriptionActive(subscription.isActive);
+        })
+        .catch(() => setSubscriptionActive(false));
+    }
+
+    if (!subscriptionActive) {
+      return;
     }
 
     if (videoRef.current && stream) {
@@ -139,7 +154,7 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
 
     logToIPFS({ ...streamLog, action: `video_${isVideoOn ? 'on' : 'off'}` });
 
-  }, [stream, isVideoOn, isMuted, isLocal, toast, user, isPremium]);
+  }, [stream, isVideoOn, isMuted, isLocal, toast, user, isPremium, subscriptionActive]);
 
   return (
     <Card
@@ -150,6 +165,21 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       role="region"
       aria-label={isLocal ? 'Local video player' : 'Remote video player'}
     >
+      {!subscriptionActive && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/75 px-6 text-center text-white backdrop-blur-sm">
+          <div className="rounded-full bg-[#FFD700]/15 p-3">
+            <Lock className="h-6 w-6 text-[#FFD700]" />
+          </div>
+          <p className="text-base font-semibold sm:text-lg">Subscribe to unlock full sessions</p>
+          <Button
+            className="min-h-12 bg-gradient-to-r from-[#FFD700] to-[#FFAA00] font-bold text-[#0F0F0F]"
+            onClick={() => router.push('/subscribe')}
+          >
+            Go to Subscribe
+          </Button>
+        </div>
+      )}
+
       {isVideoOn && stream ? (
         <video
           ref={videoRef}

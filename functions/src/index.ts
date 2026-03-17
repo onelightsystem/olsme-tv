@@ -8,18 +8,20 @@
 // - Improved error handling for prototype testing.
 import * as functions from "firebase-functions/v2";
 import * as functionsV1 from "firebase-functions/v1";
-import * as admin from "firebase-admin";
+import {initializeApp} from "firebase-admin/app";
+import {getAuth, UserRecord} from "firebase-admin/auth";
+import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {CallableRequest, onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 
-admin.initializeApp();
-const db = admin.firestore();
+initializeApp();
+const db = getFirestore();
 
 const ADMIN_EMAIL = "info@olsme.com";
 
-const setAdminClaim = async (user: admin.auth.UserRecord) => {
+const setAdminClaim = async (user: UserRecord) => {
   if (user.email === ADMIN_EMAIL && !user.customClaims?.isAdmin) {
     functions.logger.info(`Setting admin claim for ${user.uid}`);
-    await admin.auth().setCustomUserClaims(user.uid, {...user.customClaims, isAdmin: true});
+    await getAuth().setCustomUserClaims(user.uid, {...user.customClaims, isAdmin: true});
     return true;
   }
   return false;
@@ -38,12 +40,12 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    await admin.auth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
+    await getAuth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
       userId: uid,
       action: "upgradeToPremium",
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {success: true, message: "Successfully upgraded to premium."};
   } catch (error) {
@@ -77,9 +79,9 @@ export const setPolitenessClaim = onCall(async (request: CallableRequest<unknown
   }
   const verificationLevel = userData.verificationLevel || "level1";
   const decentralizedId = await generateDecentralizedId(uid);
-  const existingClaims = (await admin.auth().getUser(uid)).customClaims || {};
+  const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
   try {
-    await admin.auth().setCustomUserClaims(uid, {
+    await getAuth().setCustomUserClaims(uid, {
       ...existingClaims,
       politenessLevel,
       verificationLevel,
@@ -90,7 +92,7 @@ export const setPolitenessClaim = onCall(async (request: CallableRequest<unknown
       userId: uid,
       action: "setPolitenessClaim",
       details: {politenessLevel, verificationLevel, decentralizedId},
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {success: true, politenessLevel, verificationLevel, decentralizedId};
   } catch (error) {
@@ -122,7 +124,7 @@ export const matchUsers = onRequest({
     await db.collection("logs").add({
       action: "matchUsers",
       resultsCount: matchedUsers.length,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     res.status(200).json({matchedUsers});
     return;
@@ -166,7 +168,7 @@ export const searchUsers = onCall(async (request: CallableRequest<{ query?: stri
       action: "searchUsers",
       query: data,
       resultsCount: users.length,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {users};
   } catch (error) {
@@ -190,18 +192,65 @@ export const updateUserStatus = onCall(async (request: CallableRequest<{ status:
   try {
     await userStatusRef.set({
       status,
-      last_changed: admin.firestore.FieldValue.serverTimestamp()
+      last_changed: FieldValue.serverTimestamp()
     });
     await db.collection("logs").add({
       userId: uid,
       action: "updateUserStatus",
       details: {status},
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {success: true};
   } catch (error) {
     functions.logger.error(`Failed to update status for user ${uid}`, error);
     throw new HttpsError("internal", "Could not update user status.");
+  }
+});
+
+export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{tier: string; paypalOrderId?: string | null}>) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
+  }
+
+  const data = request.data ?? {tier: ""};
+  const tier = data.tier;
+  if (tier !== "tier1" && tier !== "tier2") {
+    throw new HttpsError("invalid-argument", "tier must be \"tier1\" or \"tier2\".");
+  }
+
+  const uid = auth.uid;
+  const userRef = db.collection("users").doc(uid);
+  const packageName = tier === "tier2" ? "premium" : "starter";
+
+  try {
+    await userRef.set({
+      subscriptionTier: tier,
+      subscriptionStatus: "active",
+      status: "active",
+      startDate: FieldValue.serverTimestamp(),
+      package: packageName,
+      paypalOrderId: data.paypalOrderId ?? null,
+    }, {merge: true});
+
+    const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
+    await getAuth().setCustomUserClaims(uid, {
+      ...existingClaims,
+      isPremium: tier === "tier2",
+      subscriptionTier: tier,
+    });
+
+    await db.collection("logs").add({
+      userId: uid,
+      action: "updateSubscriptionStatus",
+      details: {tier, paypalOrderId: data.paypalOrderId ?? null},
+      timestamp: FieldValue.serverTimestamp(),
+    });
+
+    return {success: true, tier, status: "active"};
+  } catch (error) {
+    functions.logger.error(`Failed to update subscription status for user ${uid}`, error);
+    throw new HttpsError("internal", "Could not update subscription status.");
   }
 });
 
@@ -234,7 +283,7 @@ export const sendAdminEmail = onCall(async (request: CallableRequest<{ userId: s
       userId: auth.uid,
       action: "sendAdminEmail",
       details: `KYC request for ${userId}`,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {success: true, message: "Verification request sent."};
   } catch (error) {
@@ -267,7 +316,7 @@ export const getAllUsers = onCall(async (request: CallableRequest<unknown>) => {
       userId: auth.uid,
       action: "getAllUsers",
       resultsCount: users.length,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {users};
   } catch (error) {
@@ -296,17 +345,17 @@ export const rateGuest = onCall(async (request: CallableRequest<unknown>) => {
   }
   const {guestId, rating} = payload as { guestId: string; rating: string };
   try {
-    await admin.firestore().collection("ratings").add({
+    await db.collection("ratings").add({
       userId: auth.uid,
       guestId,
       rating,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     await db.collection("logs").add({
       userId: auth.uid,
       action: "rateGuest",
       details: {guestId, rating},
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: FieldValue.serverTimestamp()
     });
     return {success: true};
   } catch (error: unknown) {
