@@ -61,26 +61,36 @@ export default function SubscribePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
+      try {
+        if (!currentUser) {
+          router.replace('/');
+          return;
+        }
+
+        setUser(currentUser);
+
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        const userData = userDoc.exists() ? (userDoc.data() as Record<string, unknown>) : {};
+
+        setProfile({
+          name: typeof userData.displayName === 'string' && userData.displayName.length > 0
+            ? userData.displayName
+            : (currentUser.displayName || 'Awakener'),
+          email: currentUser.email || 'No email provided',
+          liveId:
+            (typeof userData.decentralizedId === 'string' && userData.decentralizedId.length > 0
+              ? userData.decentralizedId
+              : currentUser.uid),
+        });
+      } catch (error) {
+        console.error('Failed to load user profile in SubscribePage:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Unable to load your profile',
+          description: 'Please refresh the page or try again later.',
+        });
         router.replace('/');
-        return;
       }
-
-      setUser(currentUser);
-
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      const userData = userDoc.exists() ? (userDoc.data() as Record<string, unknown>) : {};
-
-      setProfile({
-        name: typeof userData.displayName === 'string' && userData.displayName.length > 0
-          ? userData.displayName
-          : (currentUser.displayName || 'Awakener'),
-        email: currentUser.email || 'No email provided',
-        liveId:
-          (typeof userData.decentralizedId === 'string' && userData.decentralizedId.length > 0
-            ? userData.decentralizedId
-            : currentUser.uid),
-      });
     });
 
     return () => unsubscribe();
