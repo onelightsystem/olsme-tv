@@ -113,27 +113,39 @@ export default function HomePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        const userDoc = await getDoc(doc(db, 'users', u.uid));
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        const subscription = await getUserSubscriptionStatus(u.uid);
-        setSubscriptionActive(subscription.isActive);
-        if (!subscription.isActive) {
-          setLoading(false);
-          router.replace('/subscribe');
-          return;
+      try {
+        setUser(u);
+        if (u) {
+          const userDoc = await getDoc(doc(db, 'users', u.uid));
+          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+          const subscription = await getUserSubscriptionStatus(u.uid);
+          setSubscriptionActive(subscription.isActive);
+          if (!subscription.isActive) {
+            router.replace('/subscribe');
+            return;
+          }
+          setLoginOpen(false);
+        } else {
+          setIsPremium(false);
+          setSubscriptionActive(false);
+          setLoginOpen(true);
         }
-        setLoginOpen(false);
-      } else {
+      } catch (error) {
+        console.error('Error handling auth state change:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Authentication error',
+          description: 'There was a problem verifying your subscription. Please try again.',
+        });
         setIsPremium(false);
         setSubscriptionActive(false);
         setLoginOpen(true);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, toast]);
 
   useEffect(() => {
     // Fetch potential guests
