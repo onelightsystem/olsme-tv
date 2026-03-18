@@ -57,19 +57,19 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
   const user = auth.currentUser;
 
   useEffect(() => {
-    // Check for premium user
-    if (user) {
-      getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-      });
+    if (!user) return;
+    getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
+      setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+    });
 
-      getUserSubscriptionStatus(user.uid)
-        .then((subscription) => {
-          setSubscriptionActive(subscription.isActive);
-        })
-        .catch(() => setSubscriptionActive(false));
-    }
+    getUserSubscriptionStatus(user.uid)
+      .then((subscription) => {
+        setSubscriptionActive(subscription.isActive);
+      })
+      .catch(() => setSubscriptionActive(false));
+  }, [user]);
 
+  useEffect(() => {
     if (!subscriptionActive) {
       return;
     }

@@ -5,7 +5,7 @@ import { CheckCircle, Crown, Lock } from 'lucide-react';
 import { Button } from '@components/ui/button';
 
 const STARTER_FEATURES = [
-  'Random not-video text chat',
+  'Random non-video text chat',
   'AI politeness score',
   'Live users access',
   'Global Live ID establishment',

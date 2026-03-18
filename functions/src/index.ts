@@ -40,7 +40,8 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    await getAuth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
+    const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
+    await getAuth().setCustomUserClaims(uid, {...existingClaims, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
       userId: uid,
@@ -219,6 +220,16 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
     throw new HttpsError("invalid-argument", "tier must be \"tier1\" or \"tier2\".");
   }
 
+  // TODO: Verify the PayPal order server-side before activating the subscription.
+  // The paypalOrderId provided by the client should be validated against the PayPal
+  // Orders API (amount, currency, capture status, and replay protection) to prevent
+  // unauthenticated self-upgrades. Until server-side PayPal verification is implemented,
+  // monitor logs for abuse and restrict callable access via Firebase App Check.
+  const paypalOrderId = data.paypalOrderId;
+  if (!paypalOrderId) {
+    throw new HttpsError("invalid-argument", "A valid paypalOrderId is required to activate a subscription.");
+  }
+
   const uid = auth.uid;
   const userRef = db.collection("users").doc(uid);
   const packageName = tier === "tier2" ? "premium" : "starter";
@@ -230,7 +241,7 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
       status: "active",
       startDate: FieldValue.serverTimestamp(),
       package: packageName,
-      paypalOrderId: data.paypalOrderId ?? null,
+      paypalOrderId,
     }, {merge: true});
 
     const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
@@ -243,7 +254,7 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
     await db.collection("logs").add({
       userId: uid,
       action: "updateSubscriptionStatus",
-      details: {tier, paypalOrderId: data.paypalOrderId ?? null},
+      details: {tier, paypalOrderId},
       timestamp: FieldValue.serverTimestamp(),
     });
 

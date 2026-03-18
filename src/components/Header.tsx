@@ -48,8 +48,12 @@ export default function Header() {
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+      try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+      } catch {
+        setIsPremium(false);
+      }
     });
 
     return () => unsubscribe();

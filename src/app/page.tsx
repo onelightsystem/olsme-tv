@@ -32,7 +32,7 @@ import { getUserSubscriptionStatus } from '@lib/subscription';
 interface Guest {
   uid: string;
   displayName: string;
-  package: 'free' | 'premium';
+  package: 'free' | 'starter' | 'premium';
   verificationLevel: 'level1' | 'level2' | 'level3';
 }
 
@@ -115,25 +115,32 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        const userDoc = await getDoc(doc(db, 'users', u.uid));
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        const subscription = await getUserSubscriptionStatus(u.uid);
-        setSubscriptionActive(subscription.isActive);
-        if (!subscription.isActive) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', u.uid));
+          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+          const subscription = await getUserSubscriptionStatus(u.uid);
+          setSubscriptionActive(subscription.isActive);
+          if (!subscription.isActive) {
+            router.replace('/subscribe');
+            return;
+          }
+          setLoginOpen(false);
+        } catch {
+          setIsPremium(false);
+          setSubscriptionActive(false);
+          toast({ variant: 'destructive', title: 'Error', description: 'Unable to load subscription status. Please refresh the page or contact support if the issue persists.', id: 'subscription-load-error' });
+        } finally {
           setLoading(false);
-          router.replace('/subscribe');
-          return;
         }
-        setLoginOpen(false);
       } else {
         setIsPremium(false);
         setSubscriptionActive(false);
         setLoginOpen(true);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, toast]);
 
   useEffect(() => {
     // Fetch potential guests
