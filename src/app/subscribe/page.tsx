@@ -97,11 +97,40 @@ export default function SubscribePage() {
   }, [router]);
 
   const paypalOptions: ReactPayPalScriptOptions = useMemo(
-    () => ({
-      clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? 'test',
-      currency: 'USD',
-      intent: 'capture',
-    }),
+    () => {
+      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+
+      if (!clientId) {
+        if (
+          process.env.NODE_ENV === 'development' &&
+          process.env.NEXT_PUBLIC_USE_PAYPAL_TEST_CLIENT === 'true'
+        ) {
+          // Explicitly allow using the PayPal "test" client id in development
+          return {
+            clientId: 'test',
+            currency: 'USD',
+            intent: 'capture',
+          };
+        }
+
+        // Missing client id: log a clear error instead of silently falling back to "test"
+        console.error(
+          'Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID. PayPal checkout will not be configured correctly.'
+        );
+
+        return {
+          clientId: '',
+          currency: 'USD',
+          intent: 'capture',
+        };
+      }
+
+      return {
+        clientId,
+        currency: 'USD',
+        intent: 'capture',
+      };
+    },
     []
   );
 
