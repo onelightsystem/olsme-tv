@@ -57,7 +57,7 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
   const user = auth.currentUser;
 
   useEffect(() => {
-    // Check for premium user
+    // Check for premium user and load subscription status
     if (user) {
       getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
         setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
@@ -69,7 +69,9 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
         })
         .catch(() => setSubscriptionActive(false));
     }
+  }, [user?.uid]);
 
+  useEffect(() => {
     if (!subscriptionActive) {
       return;
     }
