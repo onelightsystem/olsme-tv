@@ -12,11 +12,127 @@ import {initializeApp} from "firebase-admin/app";
 import {getAuth, UserRecord} from "firebase-admin/auth";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {CallableRequest, onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
+import fetch from "node-fetch";
 
 initializeApp();
 const db = getFirestore();
 
 const ADMIN_EMAIL = "info@olsme.com";
+
+/**
+ * Returns the expected PayPal amount and currency for a given subscription tier.
+ * Values can be configured via environment variables; if not configured, amount
+ * validation is skipped but status verification still occurs.
+ */
+const getExpectedPaypalAmountForTier = (tier: string): {value: string; currency_code: string} | null => {
+  // Environment variables allow configuring prices without code changes.
+  if (tier === "tier1") {
+    const value = process.env.PAYPAL_TIER1_AMOUNT;
+    const currency = process.env.PAYPAL_TIER1_CURRENCY;
+    if (value && currency) {
+      return {value, currency_code: currency};
+    }
+    return null;
+  }
+  if (tier === "tier2") {
+    const value = process.env.PAYPAL_TIER2_AMOUNT;
+    const currency = process.env.PAYPAL_TIER2_CURRENCY;
+    if (value && currency) {
+      return {value, currency_code: currency};
+    }
+    return null;
+  }
+  return null;
+};
+
+/**
+ * Verifies a PayPal order server-side using the PayPal Orders v2 API.
+ * - Authenticates with PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET.
+ * - Ensures the order status is COMPLETED.
+ * - Optionally validates amount and currency against the expected tier configuration.
+ */
+const verifyPaypalOrder = async (orderId: string, tier: string): Promise<void> => {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  const apiBase = process.env.PAYPAL_API_BASE || "https://api-m.paypal.com";
+
+  if (!clientId || !clientSecret) {
+    functions.logger.error("PayPal client credentials are not configured in environment variables.");
+    throw new HttpsError("failed-precondition", "Payment verification is not configured.");
+  }
+
+  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const url = `${apiBase}/v2/checkout/orders/${encodeURIComponent(orderId)}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${authHeader}`,
+      },
+    });
+  } catch (err) {
+    functions.logger.error("Error calling PayPal Orders API", err);
+    throw new HttpsError("internal", "Failed to verify payment with PayPal.");
+  }
+
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => "");
+    functions.logger.error(`PayPal Orders API responded with status ${response.status}: ${bodyText}`);
+    throw new HttpsError("permission-denied", "Unable to verify PayPal order.");
+  }
+
+  const order: any = await response.json();
+
+  const status = order.status;
+  if (status !== "COMPLETED") {
+    functions.logger.warn(`PayPal order ${orderId} has non-completed status: ${status}`);
+    throw new HttpsError("failed-precondition", "Payment has not been completed.");
+  }
+
+  const expected = getExpectedPaypalAmountForTier(tier);
+  const purchaseUnit = Array.isArray(order.purchase_units) ? order.purchase_units[0] : undefined;
+  const amount = purchaseUnit?.amount;
+
+  if (expected && amount) {
+    const actualValue = amount.value;
+    const actualCurrency = amount.currency_code;
+    if (actualValue !== expected.value || actualCurrency !== expected.currency_code) {
+      functions.logger.error(
+          `PayPal order ${orderId} amount mismatch. Expected ${expected.value} ${expected.currency_code},` +
+          ` got ${actualValue} ${actualCurrency}`
+      );
+      throw new HttpsError("permission-denied", "Payment amount or currency is invalid for this tier.");
+    }
+  } else if (!expected) {
+    // Amount validation is skipped if not configured, but this is logged for visibility.
+    functions.logger.warn(
+        `Expected PayPal amount not configured for tier "${tier}". Skipping amount validation for order ${orderId}.`
+    );
+  }
+};
+
+/**
+ * Marks a PayPal order as used in Firestore to provide replay protection.
+ * If the orderId document already exists, the order is treated as already consumed.
+ */
+const markPaypalOrderUsed = async (orderId: string, uid: string, tier: string): Promise<void> => {
+  const orderRef = db.collection("paypalOrders").doc(orderId);
+  await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(orderRef);
+    if (snapshot.exists) {
+      functions.logger.warn(`Attempted reuse of PayPal orderId ${orderId} by user ${uid}`);
+      throw new HttpsError("already-exists", "This PayPal order has already been used.");
+    }
+    tx.set(orderRef, {
+      uid,
+      tier,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  });
+};
 
 const setAdminClaim = async (user: UserRecord) => {
   if (user.email === ADMIN_EMAIL && !user.customClaims?.isAdmin) {
@@ -40,7 +156,8 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    await getAuth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
+    const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
+    await getAuth().setCustomUserClaims(uid, {...existingClaims, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
       userId: uid,
@@ -219,18 +336,46 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
     throw new HttpsError("invalid-argument", "tier must be \"tier1\" or \"tier2\".");
   }
 
+  // TODO: Verify the PayPal order server-side before activating the subscription.
+  // The paypalOrderId provided by the client should be validated against the PayPal
+  // Orders API (amount, currency, capture status, and replay protection) to prevent
+  // unauthenticated self-upgrades. Until server-side PayPal verification is implemented,
+  // monitor logs for abuse and restrict callable access via Firebase App Check.
+  const paypalOrderId = data.paypalOrderId;
+  if (!paypalOrderId) {
+    throw new HttpsError("invalid-argument", "A valid paypalOrderId is required to activate a subscription.");
+  }
+
   const uid = auth.uid;
   const userRef = db.collection("users").doc(uid);
   const packageName = tier === "tier2" ? "premium" : "starter";
 
+  // Determine if the caller has admin privileges and may bypass PayPal verification.
+  const isAdminCaller = auth.token?.isAdmin === true || auth.token?.email === ADMIN_EMAIL;
+
   try {
+    const paypalOrderId = data.paypalOrderId ?? null;
+
+    // For non-admin callers, require a valid, server-verified, unused PayPal order.
+    if (!isAdminCaller) {
+      if (!paypalOrderId) {
+        throw new HttpsError("invalid-argument", "paypalOrderId is required to update subscription status.");
+      }
+
+      // 1) Verify the PayPal order server-side.
+      await verifyPaypalOrder(paypalOrderId, tier);
+
+      // 2) Mark the PayPal order as used to prevent replay.
+      await markPaypalOrderUsed(paypalOrderId, uid, tier);
+    }
+
     await userRef.set({
       subscriptionTier: tier,
       subscriptionStatus: "active",
       status: "active",
       startDate: FieldValue.serverTimestamp(),
       package: packageName,
-      paypalOrderId: data.paypalOrderId ?? null,
+      paypalOrderId,
     }, {merge: true});
 
     const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
@@ -243,13 +388,17 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
     await db.collection("logs").add({
       userId: uid,
       action: "updateSubscriptionStatus",
-      details: {tier, paypalOrderId: data.paypalOrderId ?? null},
+      details: {tier, paypalOrderId},
       timestamp: FieldValue.serverTimestamp(),
     });
 
     return {success: true, tier, status: "active"};
   } catch (error) {
     functions.logger.error(`Failed to update subscription status for user ${uid}`, error);
+    if (error instanceof HttpsError) {
+      // Re-throw known errors without wrapping.
+      throw error;
+    }
     throw new HttpsError("internal", "Could not update subscription status.");
   }
 });

@@ -32,7 +32,7 @@ import { getUserSubscriptionStatus } from '@lib/subscription';
 interface Guest {
   uid: string;
   displayName: string;
-  package: 'free' | 'premium';
+  package: 'free' | 'starter' | 'premium';
   verificationLevel: 'level1' | 'level2' | 'level3';
 }
 
@@ -120,19 +120,16 @@ export default function HomePage() {
         setSubscriptionActive(subscription.isActive);
         if (!subscription.isActive) {
           setLoading(false);
-          router.replace('/subscribe');
-          return;
         }
-        setLoginOpen(false);
       } else {
         setIsPremium(false);
         setSubscriptionActive(false);
         setLoginOpen(true);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [router, toast]);
 
   useEffect(() => {
     // Fetch potential guests

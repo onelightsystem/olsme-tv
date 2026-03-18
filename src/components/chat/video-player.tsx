@@ -67,6 +67,7 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
         .catch(() => setSubscriptionActive(false));
     }
 
+  useEffect(() => {
     if (!subscriptionActive) {
       return;
     }
