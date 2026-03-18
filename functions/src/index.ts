@@ -40,7 +40,9 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    await getAuth().setCustomUserClaims(uid, {...auth.token, isPremium: true});
+    const userRecord = await getAuth().getUser(uid);
+    const existingClaims = userRecord.customClaims || {};
+    await getAuth().setCustomUserClaims(uid, {...existingClaims, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
       userId: uid,
