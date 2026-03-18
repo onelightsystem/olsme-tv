@@ -41,18 +41,42 @@ export default function Header() {
   const [authInitialTab, setAuthInitialTab] = useState<'signin' | 'signup'>('signin');
 
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (!isMounted) {
+        return;
+      }
+
       setUser(currentUser);
+
       if (!currentUser) {
         setIsPremium(false);
         return;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+      try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+
+        if (!isMounted) {
+          return;
+        }
+
+        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error('Failed to fetch user premium status:', error);
+        setIsPremium(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const profileLabel = useMemo(() => {
