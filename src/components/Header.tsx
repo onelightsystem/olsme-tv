@@ -41,8 +41,15 @@ export default function Header() {
   const [authInitialTab, setAuthInitialTab] = useState<'signin' | 'signup'>('signin');
 
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (!isMounted) {
+        return;
+      }
+
       setUser(currentUser);
+
       if (!currentUser) {
         setIsPremium(false);
         return;
@@ -56,7 +63,10 @@ export default function Header() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const profileLabel = useMemo(() => {

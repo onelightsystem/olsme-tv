@@ -61,12 +61,13 @@ export default function SubscribePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace('/');
-        return;
-      }
+      try {
+        if (!currentUser) {
+          router.replace('/');
+          return;
+        }
 
-      setUser(currentUser);
+        setUser(currentUser);
 
       try {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
