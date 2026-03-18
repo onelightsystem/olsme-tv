@@ -32,7 +32,7 @@ import { getUserSubscriptionStatus } from '@lib/subscription';
 interface Guest {
   uid: string;
   displayName: string;
-  package: 'free' | 'premium';
+  package: 'free' | 'starter' | 'premium';
   verificationLevel: 'level1' | 'level2' | 'level3';
 }
 
