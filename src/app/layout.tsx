@@ -19,7 +19,7 @@ import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
-import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { debounce } from 'lodash';
@@ -90,10 +90,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
       try {
         if (u) {
-          await u.getIdToken(true); // Force refresh token for custom claims
+          const {claims} = await u.getIdTokenResult(true); // Force refresh token for custom claims
           debouncedUpdateStatus('online');
-          const userDoc = await getDoc(doc(db, 'users', u.uid));
-          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+          setIsPremium(claims.isPremium === true || claims.subscriptionTier === 'tier2');
         } else if (user) {
           debouncedUpdateStatus('offline');
           setIsPremium(false);

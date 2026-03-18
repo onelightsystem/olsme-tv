@@ -15,7 +15,7 @@ import { auth, db } from '@lib/firebase/config';
 import { useToast } from '@hooks/use-toast';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback, formatErrorLog, generateCorrelationId, formatInfoLog } from '@lib/utils';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, doc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
@@ -115,9 +115,8 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        const userDoc = await getDoc(doc(db, 'users', u.uid));
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        const subscription = await getUserSubscriptionStatus(u.uid);
+        const subscription = await getUserSubscriptionStatus(u);
+        setIsPremium(subscription.tier === 'tier2');
         setSubscriptionActive(subscription.isActive);
         if (!subscription.isActive) {
           setLoading(false);
