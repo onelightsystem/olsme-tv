@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Sparkles, X } from 'lucide-react';
 import {
@@ -18,10 +17,10 @@ import { Switch } from '@components/ui/switch';
 type LoginModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onContinue?: () => void;
 };
 
-export default function LoginModal({ open, onOpenChange }: LoginModalProps) {
-  const router = useRouter();
+export default function LoginModal({ open, onOpenChange, onContinue }: LoginModalProps) {
   const [mindfulMode, setMindfulMode] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,7 +44,12 @@ export default function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const handleSignIn = () => {
     setIsConnecting(true);
     timerRef.current = setTimeout(() => {
-      router.push('/profile');
+      setIsConnecting(false);
+      if (onContinue) {
+        onContinue();
+      } else {
+        onOpenChange(false);
+      }
     }, 1400);
   };
 
@@ -98,8 +102,8 @@ export default function LoginModal({ open, onOpenChange }: LoginModalProps) {
                 >
                   <motion.div
                     className="rounded-full bg-[#FFD700]/15 p-4"
-                    animate={{ y: [10, -10, 10], opacity: [0.75, 1, 0.75] }}
-                    transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                    animate={{ y: -10, opacity: 1 }}
+                    transition={{ duration: 2.2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
                   >
                     <Sun className="h-8 w-8 text-[#FFD700]" aria-hidden="true" />
                   </motion.div>

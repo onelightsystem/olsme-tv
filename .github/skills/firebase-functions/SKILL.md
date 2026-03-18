@@ -17,16 +17,20 @@ Keywords: firebase-functions, onCall, onRequest, auth trigger, CallableRequest, 
 1. Reproduce
 - Run functions-only typecheck:
   - `npm run check:types:functions`
+- If behavior differs between app and functions, validate both contexts separately before editing.
 
 2. Fix Contracts
 - Match Firebase Functions v2 handler signatures.
 - Avoid `any`; define request/response payload types.
 - Keep callable auth checks explicit and safe.
+- Preserve existing exported function names unless a breaking change is explicitly requested.
 
 3. Validate
 - Re-run functions typecheck and lint:
   - `npm run check:types:functions`
   - `npm run check:lint:functions`
+- If callables are touched from app code, also run app typecheck:
+  - `npm run check:types`
 
 ## Repo-Specific Notes
 
@@ -39,3 +43,4 @@ Keywords: firebase-functions, onCall, onRequest, auth trigger, CallableRequest, 
 - Functions compile cleanly.
 - No signature mismatch for v2 APIs.
 - Deployment surface remains backward compatible unless explicitly requested.
+- Validation commands and any residual risk are clearly reported.

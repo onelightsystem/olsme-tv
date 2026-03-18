@@ -202,19 +202,24 @@ async function toastPolitenessScore({
       ? `${message} - Premium insights for mindful chats!`
       : message;
 
+    const actionElement: ToastActionElement | undefined =
+      badge === 'Bronze'
+        ? React.createElement(
+          ToastAction,
+          {
+            altText: 'Improve politeness tips',
+            onClick: () => {
+              window.location.href = '/tips';
+            },
+          },
+          'Improve'
+        ) as ToastActionElement
+        : undefined;
+
     const toastProps = {
       title: `Politeness: ${badge}`,
       description: enhancedMessage,
-      action: badge === 'Bronze' ? React.createElement(
-        ToastAction,
-        {
-          altText: 'Improve politeness tips',
-          onClick: () => {
-            window.location.href = '/tips';
-          },
-        },
-        'Improve'
-      ) : undefined,
+      action: actionElement,
       'aria-live': 'polite' as const, // Accessibility
     };
 

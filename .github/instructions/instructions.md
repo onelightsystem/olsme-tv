@@ -24,7 +24,21 @@ applyTo: '**/*.{ts,tsx,js,jsx,json,md}'
 	- `npm run check:lint`
 	- `npm run check:types`
 	- `npm run check:security`
+	- `npm run build` (when changing routing, layout, or server-rendered page logic)
 - If a command fails due unrelated pre-existing issues, do not rewrite unrelated modules; document scope clearly.
+
+## Known Non-Blocking Dev Warnings
+
+- Treat these as informational unless they correlate with user-facing regressions:
+	- React DevTools suggestion in local dev.
+	- Google Analytics cookie overwrite messages.
+	- Firestore streaming `NS_BINDING_ABORTED` during navigation/unload.
+	- Font preload "not used within a few seconds" in hot-reload sessions.
+- Prioritize actionable failures:
+	- TypeScript compile errors,
+	- Next.js build/prerender errors,
+	- runtime exceptions in app/function code,
+	- moderate/high/critical security findings.
 
 ## Dependency and Security Work
 

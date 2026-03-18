@@ -12,14 +12,14 @@ import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@lib/utils';
 import { Toaster } from '@components/ui/toaster';
-import Header from '@components/layout/header';
+import Header from '@components/Header';
 import { auth, db } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
-import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { debounce } from 'lodash';
@@ -90,10 +90,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
       try {
         if (u) {
-          await u.getIdToken(true); // Force refresh token for custom claims
+          const {claims} = await u.getIdTokenResult(true); // Force refresh token for custom claims
           debouncedUpdateStatus('online');
-          const userDoc = await getDoc(doc(db, 'users', u.uid));
-          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
+          setIsPremium(claims.isPremium === true || claims.subscriptionTier === 'tier2');
         } else if (user) {
           debouncedUpdateStatus('offline');
           setIsPremium(false);
@@ -166,7 +165,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       >
         <div className="relative flex min-h-screen flex-col">
           <Header />
-          <main className="flex-1" role="main">
+          <main className="flex-1 pt-16" role="main">
             {children}
           </main>
         </div>
