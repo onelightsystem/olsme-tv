@@ -4,14 +4,14 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { Lock, Heart, Users, Sparkles } from 'lucide-react';
 
-type LogEntry = {
+export type LogEntry = {
   date: Date;
   title: string;
   description: string;
   screenshot?: string;
 };
 
-const developerLogEntries: LogEntry[] = [
+export const developerLogEntries: LogEntry[] = [
   {
     date: new Date('2026-03-17'),
     title: 'Premium subscription button & PayPal integration added',
