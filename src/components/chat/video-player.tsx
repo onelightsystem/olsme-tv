@@ -22,7 +22,7 @@ import { db, auth } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, doc, writeBatch } from 'firebase/firestore';
 import { cn } from '@lib/utils';
 import { getUserSubscriptionStatus } from '@lib/subscription';
 
@@ -57,17 +57,15 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
   const user = auth.currentUser;
 
   useEffect(() => {
-    if (!user) return;
-    getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
-      setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-    });
-
-    getUserSubscriptionStatus(user.uid)
-      .then((subscription) => {
-        setSubscriptionActive(subscription.isActive);
-      })
-      .catch(() => setSubscriptionActive(false));
-  }, [user]);
+    // Check for premium user
+    if (user) {
+      getUserSubscriptionStatus(user)
+        .then((subscription) => {
+          setIsPremium(subscription.tier === 'tier2');
+          setSubscriptionActive(subscription.isActive);
+        })
+        .catch(() => setSubscriptionActive(false));
+    }
 
   useEffect(() => {
     if (!subscriptionActive) {
