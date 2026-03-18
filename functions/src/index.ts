@@ -156,8 +156,7 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   const userRef = db.collection("users").doc(uid);
   try {
     await userRef.update({package: "premium"});
-    const userRecord = await getAuth().getUser(uid);
-    const existingClaims = userRecord.customClaims || {};
+    const existingClaims = (await getAuth().getUser(uid)).customClaims || {};
     await getAuth().setCustomUserClaims(uid, {...existingClaims, isPremium: true});
     functions.logger.info(`User ${uid} successfully upgraded to premium.`);
     await db.collection("logs").add({
@@ -335,6 +334,16 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
   const tier = data.tier;
   if (tier !== "tier1" && tier !== "tier2") {
     throw new HttpsError("invalid-argument", "tier must be \"tier1\" or \"tier2\".");
+  }
+
+  // TODO: Verify the PayPal order server-side before activating the subscription.
+  // The paypalOrderId provided by the client should be validated against the PayPal
+  // Orders API (amount, currency, capture status, and replay protection) to prevent
+  // unauthenticated self-upgrades. Until server-side PayPal verification is implemented,
+  // monitor logs for abuse and restrict callable access via Firebase App Check.
+  const paypalOrderId = data.paypalOrderId;
+  if (!paypalOrderId) {
+    throw new HttpsError("invalid-argument", "A valid paypalOrderId is required to activate a subscription.");
   }
 
   const uid = auth.uid;

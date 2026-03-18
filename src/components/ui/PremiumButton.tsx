@@ -19,23 +19,19 @@ export default function PremiumButton({
   currency = 'USD',
   className,
 }: PremiumButtonProps) {
-  const resolvedClientId =
-    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ??
-    (process.env.NODE_ENV === 'development' ? 'test' : undefined);
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const isPaypalMisconfigured = !paypalClientId && process.env.NODE_ENV === 'production';
 
-  if (!resolvedClientId) {
-    console.error(
-      'PayPal client ID is missing. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID to enable PayPal checkout.'
-    );
+  if (isPaypalMisconfigured) {
+    console.error('NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set. PayPal checkout is disabled.');
+    return null;
   }
 
-  const paypalOptions: ReactPayPalScriptOptions | undefined = resolvedClientId
-    ? {
-        clientId: resolvedClientId,
-        currency,
-        intent: 'capture',
-      }
-    : undefined;
+  const paypalOptions: ReactPayPalScriptOptions = {
+    clientId: paypalClientId ?? 'test',
+    currency,
+    intent: 'capture',
+  };
 
   return (
     <div

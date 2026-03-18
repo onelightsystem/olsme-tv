@@ -113,9 +113,9 @@ export default function HomePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      try {
-        setUser(u);
-        if (u) {
+      setUser(u);
+      if (u) {
+        try {
           const userDoc = await getDoc(doc(db, 'users', u.uid));
           setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
           const subscription = await getUserSubscriptionStatus(u.uid);
@@ -125,22 +125,17 @@ export default function HomePage() {
             return;
           }
           setLoginOpen(false);
-        } else {
+        } catch {
           setIsPremium(false);
           setSubscriptionActive(false);
-          setLoginOpen(true);
+          toast({ variant: 'destructive', title: 'Error', description: 'Unable to load subscription status. Please refresh the page or contact support if the issue persists.', id: 'subscription-load-error' });
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error handling auth state change:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Authentication error',
-          description: 'There was a problem verifying your subscription. Please try again.',
-        });
+      } else {
         setIsPremium(false);
         setSubscriptionActive(false);
         setLoginOpen(true);
-      } finally {
         setLoading(false);
       }
     });

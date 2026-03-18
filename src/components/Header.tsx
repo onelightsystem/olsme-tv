@@ -57,18 +57,8 @@ export default function Header() {
 
       try {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-
-        if (!isMounted) {
-          return;
-        }
-
         setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        console.error('Failed to fetch user premium status:', error);
+      } catch {
         setIsPremium(false);
       }
     });

@@ -32,7 +32,7 @@ const TIER_COPY: Record<Tier, { amount: string; title: string; button: string; f
     title: 'Basic Entry',
     button: 'Choose Basic - $0.25/month',
     features: [
-      'Random not-video text chat',
+      'Random non-video text chat',
       'AI politeness score',
       'Live users access',
       'Global Live ID establishment',
@@ -69,6 +69,7 @@ export default function SubscribePage() {
 
         setUser(currentUser);
 
+      try {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         const userData = userDoc.exists() ? (userDoc.data() as Record<string, unknown>) : {};
 
@@ -82,56 +83,32 @@ export default function SubscribePage() {
               ? userData.decentralizedId
               : currentUser.uid),
         });
-      } catch (error) {
-        console.error('Failed to load user profile in SubscribePage:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Unable to load your profile',
-          description: 'Please refresh the page or try again later.',
+      } catch {
+        // Fall back to auth-only profile if Firestore read fails
+        setProfile({
+          name: currentUser.displayName || 'Awakener',
+          email: currentUser.email || 'No email provided',
+          liveId: currentUser.uid,
         });
-        router.replace('/');
       }
     });
 
     return () => unsubscribe();
   }, [router]);
 
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const isPaypalMisconfigured = !paypalClientId && process.env.NODE_ENV === 'production';
+  if (isPaypalMisconfigured) {
+    console.error('NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set. PayPal checkout is disabled.');
+  }
+
   const paypalOptions: ReactPayPalScriptOptions = useMemo(
-    () => {
-      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-
-      if (!clientId) {
-        if (
-          process.env.NODE_ENV === 'development' &&
-          process.env.NEXT_PUBLIC_USE_PAYPAL_TEST_CLIENT === 'true'
-        ) {
-          // Explicitly allow using the PayPal "test" client id in development
-          return {
-            clientId: 'test',
-            currency: 'USD',
-            intent: 'capture',
-          };
-        }
-
-        // Missing client id: log a clear error instead of silently falling back to "test"
-        console.error(
-          'Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID. PayPal checkout will not be configured correctly.'
-        );
-
-        return {
-          clientId: '',
-          currency: 'USD',
-          intent: 'capture',
-        };
-      }
-
-      return {
-        clientId,
-        currency: 'USD',
-        intent: 'capture',
-      };
-    },
-    []
+    () => ({
+      clientId: paypalClientId ?? 'test',
+      currency: 'USD',
+      intent: 'capture',
+    }),
+    [paypalClientId]
   );
 
   const handleApprove = async (tier: Tier, orderId: string | undefined) => {
@@ -207,6 +184,11 @@ export default function SubscribePage() {
 
         <PayPalScriptProvider options={paypalOptions}>
           <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
+            {isPaypalMisconfigured && (
+              <div className="col-span-full rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+                Payment checkout is currently unavailable. Please contact support.
+              </div>
+            )}
             {(['tier1', 'tier2'] as const).map((tier, index) => {
               const isPremium = tier === 'tier2';
               const copy = TIER_COPY[tier];
@@ -254,6 +236,9 @@ export default function SubscribePage() {
 
                       {selectedTier === tier && (
                         <div className="mt-4 rounded-xl border border-white/15 bg-black/25 p-3">
+                          {isPaypalMisconfigured ? (
+                            <p className="text-center text-sm text-red-300">Payment checkout is unavailable.</p>
+                          ) : (
                           <PayPalButtons
                             style={{ layout: 'vertical', label: 'paypal', height: 48 }}
                             forceReRender={[copy.amount, tier]}
@@ -275,6 +260,7 @@ export default function SubscribePage() {
                               await handleApprove(tier, data.orderID);
                             }}
                           />
+                          )}
                         </div>
                       )}
                     </CardContent>
