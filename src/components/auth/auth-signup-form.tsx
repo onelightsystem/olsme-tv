@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Phone, Twitter } from 'lucide-react';
 import {
@@ -29,10 +30,24 @@ type AuthSignupFormProps = {
   onSignInClick?: () => void;
 };
 
+type TurnstileApi = {
+  getResponse: (widgetId?: string) => string;
+  reset: (widgetId?: string) => void;
+  execute: (widgetId?: string) => void;
+};
+
+declare global {
+  interface Window {
+    cfturnstile?: TurnstileApi;
+    onTurnstileSuccess?: (token: string) => void;
+  }
+}
+
 const inputClassName =
   'min-h-12 sm:min-h-14 border-white/12 bg-black/30 text-base sm:text-lg text-white placeholder:text-white/30 focus-visible:border-[#FFD700]/45 focus-visible:ring-2 focus-visible:ring-[#FFD700]/30';
 
 export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
@@ -44,6 +59,49 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
   const [verificationCode, setVerificationCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const tokenWaiterRef = useRef<((token: string) => void) | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const successHandler = (token: string) => {
+      setTurnstileToken(token);
+      if (tokenWaiterRef.current) {
+        tokenWaiterRef.current(token);
+        tokenWaiterRef.current = null;
+      }
+    };
+
+    window.onTurnstileSuccess = successHandler;
+
+    return () => {
+      if (window.onTurnstileSuccess === successHandler) {
+        delete window.onTurnstileSuccess;
+      }
+    };
+  }, []);
+
+  const requestTurnstileToken = async (): Promise<string> => {
+    if (typeof window === 'undefined' || !window.cfturnstile) return '';
+
+    const existingToken = window.cfturnstile.getResponse();
+    if (existingToken) {
+      return existingToken;
+    }
+
+    window.cfturnstile.execute();
+
+    return await new Promise<string>((resolve) => {
+      tokenWaiterRef.current = resolve;
+      setTimeout(() => {
+        if (tokenWaiterRef.current) {
+          tokenWaiterRef.current = null;
+          resolve(window.cfturnstile?.getResponse() ?? '');
+        }
+      }, 4000);
+    });
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,8 +115,45 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
     setErrorMessage(null);
 
     try {
-      await signUpWithEmail(signUpEmail, signUpPassword, displayName);
+      const token = turnstileToken || (await requestTurnstileToken());
+      if (!token) {
+        toast({
+          variant: 'destructive',
+          title: 'Verification Failed',
+          description: 'Bot verification failed – try again',
+        });
+        setErrorMessage('Bot verification failed – try again');
+        return;
+      }
+
+      const signUpPayload = {
+        email: signUpEmail.trim(),
+        password: signUpPassword,
+        name: displayName.trim(),
+        turnstileToken: token,
+      };
+
+      const verifyResponse = await fetch('/api/verify-turnstile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signUpPayload),
+      });
+
+      if (!verifyResponse.ok) {
+        window.cfturnstile?.reset();
+        setTurnstileToken('');
+        toast({
+          variant: 'destructive',
+          title: 'Verification Failed',
+          description: 'Bot verification failed – try again',
+        });
+        setErrorMessage('Bot verification failed – try again');
+        return;
+      }
+
+      await signUpWithEmail(signUpPayload.email, signUpPayload.password, signUpPayload.name);
       toast({ title: 'Account Created', description: 'Welcome to Awake Chat!' });
+      router.push('/subscribe');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create account right now.');
     } finally {
@@ -218,7 +313,20 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
               </div>
             </div>
 
-            {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
+            {errorMessage && (
+              <p className="rounded-md border border-[#FFD700]/35 bg-[#FFD700]/10 px-3 py-2 text-sm text-[#FFE7A0]">
+                {errorMessage}
+              </p>
+            )}
+
+            <div
+              className="cf-turnstile"
+              data-sitekey="0x4AAAAAACtyC3i-iOSgjRDk"
+              data-callback="onTurnstileSuccess"
+              data-theme="dark"
+              data-size="invisible"
+              data-action="signup"
+            />
 
             <motion.div whileHover={{ scale: 1.03 }} transition={{ duration: 0.18 }}>
               <Button

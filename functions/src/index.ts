@@ -12,10 +12,11 @@ import {initializeApp} from "firebase-admin/app";
 import {getAuth, UserRecord} from "firebase-admin/auth";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {CallableRequest, onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
-import fetch from "node-fetch";
 
 initializeApp();
 const db = getFirestore();
+
+const callableCorsOrigins = true;
 
 const ADMIN_EMAIL = "info@olsme.com";
 
@@ -43,6 +44,16 @@ const getExpectedPaypalAmountForTier = (tier: string): {value: string; currency_
     return null;
   }
   return null;
+};
+
+type PaypalOrderResponse = {
+  status?: string;
+  purchase_units?: Array<{
+    amount?: {
+      value?: string;
+      currency_code?: string;
+    };
+  }>;
 };
 
 /**
@@ -84,7 +95,7 @@ const verifyPaypalOrder = async (orderId: string, tier: string): Promise<void> =
     throw new HttpsError("permission-denied", "Unable to verify PayPal order.");
   }
 
-  const order: any = await response.json();
+  const order = await response.json() as PaypalOrderResponse;
 
   const status = order.status;
   if (status !== "COMPLETED") {
@@ -101,7 +112,7 @@ const verifyPaypalOrder = async (orderId: string, tier: string): Promise<void> =
     const actualCurrency = amount.currency_code;
     if (actualValue !== expected.value || actualCurrency !== expected.currency_code) {
       functions.logger.error(
-          `PayPal order ${orderId} amount mismatch. Expected ${expected.value} ${expected.currency_code},` +
+        `PayPal order ${orderId} amount mismatch. Expected ${expected.value} ${expected.currency_code},` +
           ` got ${actualValue} ${actualCurrency}`
       );
       throw new HttpsError("permission-denied", "Payment amount or currency is invalid for this tier.");
@@ -109,7 +120,7 @@ const verifyPaypalOrder = async (orderId: string, tier: string): Promise<void> =
   } else if (!expected) {
     // Amount validation is skipped if not configured, but this is logged for visibility.
     functions.logger.warn(
-        `Expected PayPal amount not configured for tier "${tier}". Skipping amount validation for order ${orderId}.`
+      `Expected PayPal amount not configured for tier "${tier}". Skipping amount validation for order ${orderId}.`
     );
   }
 };
@@ -147,7 +158,7 @@ export const onUserCreate = functionsV1.auth.user().onCreate(async (user) => {
   await setAdminClaim(user);
 });
 
-export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>) => {
+export const upgradeToPremium = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
@@ -171,7 +182,7 @@ export const upgradeToPremium = onCall(async (request: CallableRequest<unknown>)
   }
 });
 
-export const setPolitenessClaim = onCall(async (request: CallableRequest<unknown>) => {
+export const setPolitenessClaim = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
@@ -252,7 +263,7 @@ export const matchUsers = onRequest({
   }
 });
 
-export const searchUsers = onCall(async (request: CallableRequest<{ query?: string; verificationLevel?: string }>) => {
+export const searchUsers = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<{ query?: string; verificationLevel?: string }>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "You must be logged in to search for users.");
@@ -294,7 +305,7 @@ export const searchUsers = onCall(async (request: CallableRequest<{ query?: stri
   }
 });
 
-export const updateUserStatus = onCall(async (request: CallableRequest<{ status: string }>) => {
+export const updateUserStatus = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<{ status: string }>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
@@ -324,7 +335,7 @@ export const updateUserStatus = onCall(async (request: CallableRequest<{ status:
   }
 });
 
-export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{tier: string; paypalOrderId?: string | null}>) => {
+export const updateSubscriptionStatus = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<{tier: string; paypalOrderId?: string | null}>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
@@ -403,7 +414,7 @@ export const updateSubscriptionStatus = onCall(async (request: CallableRequest<{
   }
 });
 
-export const sendAdminEmail = onCall(async (request: CallableRequest<{ userId: string; displayName: string; email: string }>) => {
+export const sendAdminEmail = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<{ userId: string; displayName: string; email: string }>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
@@ -441,7 +452,7 @@ export const sendAdminEmail = onCall(async (request: CallableRequest<{ userId: s
   }
 });
 
-export const getAllUsers = onCall(async (request: CallableRequest<unknown>) => {
+export const getAllUsers = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
   const auth = request.auth;
   if (!auth?.token.isAdmin) {
     throw new HttpsError("permission-denied", "Must be an admin to access user data.");
@@ -474,7 +485,7 @@ export const getAllUsers = onCall(async (request: CallableRequest<unknown>) => {
   }
 });
 
-export const rateGuest = onCall(async (request: CallableRequest<unknown>) => {
+export const rateGuest = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
   const auth = request.auth;
   if (!auth) {
     throw new HttpsError("unauthenticated", "User must be authenticated.");

@@ -8,6 +8,7 @@
 // - Solo Tip: Test with `npm run dev`, check font rendering, log auth state in Firestore/IPFS.
 'use client';
 import type { Metadata } from 'next';
+import { usePathname, useRouter } from 'next/navigation';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@lib/utils';
@@ -19,7 +20,7 @@ import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
 import { useEffect, useState } from 'react';
 import { metadata } from './metadata';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { debounce } from 'lodash';
@@ -46,6 +47,8 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [isPremium, setIsPremium] = useState(false);
 
@@ -150,11 +153,33 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (snap) => {
+      const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
+      const hasPremiumAccess =
+        data?.isPremium === true ||
+        data?.subscriptionTier === 'tier2' ||
+        data?.subscriptionStatus === 'active';
+
+      setIsPremium(hasPremiumAccess);
+
+      if (!hasPremiumAccess && pathname !== '/subscribe') {
+        router.push('/subscribe');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [pathname, router, user]);
+
   return (
     <html lang="en" className={ptSans.className} suppressHydrationWarning>
       <head>
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description?.toString() ?? ''} />
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
       </head>
       <body
         className={cn(
