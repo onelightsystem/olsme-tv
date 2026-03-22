@@ -197,7 +197,8 @@ export default function SubscribePage() {
 
     // Map 4-variant frontend tier to backend tier1/tier2 identifier
     const backendTier = tier.startsWith('tier2') ? 'tier2' : 'tier1';
-    // Business logic: annual = one-time payment (not recurring); monthly = recurring subscription
+    // Business logic: both annual and monthly are processed as one-time PayPal payments;
+    // `billingPeriod` is used by the backend to distinguish monthly vs annual access terms.
     const billingPeriod = tier.endsWith('-annual') ? 'annual' : 'monthly';
 
     try {
