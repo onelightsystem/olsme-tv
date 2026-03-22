@@ -145,7 +145,7 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
                     transition={{ duration: 0.18 }}
                     className={`text-4xl font-bold ${tier.isPremium ? 'text-[#FFD700]' : 'text-white'}`}
                   >
-                    ${price}
+                    ${price.toFixed(2)}
                     <span className="text-sm font-normal text-white/75">
                       &thinsp;{isAnnual ? '/ year' : '/ month'}
                     </span>
