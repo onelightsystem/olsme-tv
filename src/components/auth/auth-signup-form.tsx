@@ -43,6 +43,8 @@ declare global {
   }
 }
 
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
 const inputClassName =
   'min-h-12 sm:min-h-14 border-white/12 bg-black/30 text-base sm:text-lg text-white placeholder:text-white/30 focus-visible:border-[#FFD700]/45 focus-visible:ring-2 focus-visible:ring-[#FFD700]/30';
 
@@ -115,33 +117,40 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
     setErrorMessage(null);
 
     try {
-      const token = turnstileToken || (await requestTurnstileToken());
-      if (!token) {
-        toast({
-          variant: 'destructive',
-          title: 'Verification Failed',
-          description: 'Bot verification failed – try again',
-        });
-        setErrorMessage('Bot verification failed – try again');
-        return;
-      }
+      if (TURNSTILE_SITE_KEY) {
+        const token = turnstileToken || (await requestTurnstileToken());
+        if (!token) {
+          toast({
+            variant: 'destructive',
+            title: 'Verification Failed',
+            description: 'Bot verification failed – try again',
+          });
+          setErrorMessage('Bot verification failed – try again');
+          return;
+        }
 
-      const verifyResponse = await fetch('/api/verify-turnstile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ turnstileToken: token }),
-      });
-
-      if (!verifyResponse.ok) {
-        window.cfturnstile?.reset();
-        setTurnstileToken('');
-        toast({
-          variant: 'destructive',
-          title: 'Verification Failed',
-          description: 'Bot verification failed – try again',
+        const verifyResponse = await fetch('/api/verify-turnstile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: signUpEmail.trim(),
+            password: signUpPassword,
+            name: displayName.trim(),
+            turnstileToken: token,
+          }),
         });
-        setErrorMessage('Bot verification failed – try again');
-        return;
+
+        if (!verifyResponse.ok) {
+          window.cfturnstile?.reset();
+          setTurnstileToken('');
+          toast({
+            variant: 'destructive',
+            title: 'Verification Failed',
+            description: 'Bot verification failed – try again',
+          });
+          setErrorMessage('Bot verification failed – try again');
+          return;
+        }
       }
 
       await signUpWithEmail(signUpEmail.trim(), signUpPassword, displayName.trim());
@@ -312,14 +321,16 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
               </p>
             )}
 
-            <div
-              className="cf-turnstile"
-              data-sitekey="0x4AAAAAACtyC3i-iOSgjRDk"
-              data-callback="onTurnstileSuccess"
-              data-theme="dark"
-              data-size="invisible"
-              data-action="signup"
-            />
+            {TURNSTILE_SITE_KEY && (
+              <div
+                className="cf-turnstile"
+                data-sitekey={TURNSTILE_SITE_KEY}
+                data-callback="onTurnstileSuccess"
+                data-theme="dark"
+                data-size="invisible"
+                data-action="signup"
+              />
+            )}
 
             <motion.div whileHover={{ scale: 1.03 }} transition={{ duration: 0.18 }}>
               <Button
