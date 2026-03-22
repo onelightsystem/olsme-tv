@@ -14,8 +14,8 @@ const STARTER_ANNUAL_PRICE = 10;  // one-time deal lock – 12 months
 const PREMIUM_ANNUAL_PRICE = 30;  // one-time deal lock – 12 months
 
 const STARTER_FEATURES = [
-  "Olsme tech subscription",
-  "Random text chat (non-video)",
+  "Olsme platform subscription",
+  "Random non-video text chat",
   "AI politeness score",
   "Access to live users",
   "Real humans only",
@@ -25,7 +25,7 @@ const STARTER_FEATURES = [
 
 const PREMIUM_FEATURES = [
   "Everything in Starter, plus:",
-  "Earn money hosting live TV sessions",
+  "Earn revenue by hosting live TV sessions",
   "Unlimited sessions",
   "Full AI politeness insights",
   "Priority matching",
