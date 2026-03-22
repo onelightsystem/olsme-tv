@@ -6,19 +6,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Returns true if the incoming write does not touch server-managed subscription fields.
-    function noSubscriptionFieldsChanged(data) {
-      return !data.hasAny(['subscriptionStatus', 'subscriptionTier', 'paypalOrderId', 'startDate', 'status', 'package']);
-    }
-
     match /users/{userId} {
-      allow read: if request.auth != null;
-      // Clients may only create their own profile without subscription fields.
-      allow create: if request.auth != null && request.auth.uid == userId
-        && noSubscriptionFieldsChanged(request.resource.data.keys());
-      // Clients may update their own profile but cannot change subscription fields.
-      allow update: if request.auth != null && request.auth.uid == userId
-        && noSubscriptionFieldsChanged(request.resource.data.diff(resource.data).affectedKeys());
+      // Server-managed subscription/premium fields that clients must not set or modify.
+      // These are written exclusively by Cloud Functions (updateSubscriptionStatus, etc.).
+      function serverManagedFields() {
+        return ['isPremium', 'subscriptionTier', 'subscriptionStatus',
+                'package', 'startDate', 'paypalOrderId'];
+      }
+
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Allow creating own document (e.g. during signup) but not with subscription fields.
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(serverManagedFields());
+
+      // Allow updating own document but prevent changing any subscription/premium field.
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasNone(serverManagedFields());
+    }
+    match /subscriptions/{document=**} {
+      // Only the owning user can read their subscription document.
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Only server/admin (identified via custom claim) can modify subscription documents.
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
     }
     match /users/{userId}/{subcollection=**} {
       allow read, write: if request.auth != null;

@@ -6,6 +6,7 @@
 // - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {},
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)
   },
