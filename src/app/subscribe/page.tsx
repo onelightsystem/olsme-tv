@@ -403,8 +403,12 @@ export default function SubscribePage() {
                                 purchase_units: [
                                   {
                                     amount: { currency_code: 'USD', value: copy.amount },
-                                    // Business logic: annual = one-time payment (not recurring); monthly = recurring subscription
-                                    description: `olsme.tv ${copy.title} – ${copy.isAnnual ? '12-month plan (one-time)' : 'monthly subscription'}`,
+                                    // Business logic: both annual and monthly are one-time payments (not recurring) via PayPal Orders
+                                    description: `olsme.tv ${copy.title} – ${
+                                      copy.isAnnual
+                                        ? '12-month plan (one-time payment)'
+                                        : '30-day access (one-time, non-recurring)'
+                                    }`,
                                   },
                                 ],
                               });
