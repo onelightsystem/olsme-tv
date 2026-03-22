@@ -126,17 +126,10 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
         return;
       }
 
-      const signUpPayload = {
-        email: signUpEmail.trim(),
-        password: signUpPassword,
-        name: displayName.trim(),
-        turnstileToken: token,
-      };
-
       const verifyResponse = await fetch('/api/verify-turnstile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(signUpPayload),
+        body: JSON.stringify({ turnstileToken: token }),
       });
 
       if (!verifyResponse.ok) {
@@ -151,7 +144,7 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
         return;
       }
 
-      await signUpWithEmail(signUpPayload.email, signUpPayload.password, signUpPayload.name);
+      await signUpWithEmail(signUpEmail.trim(), signUpPassword, displayName.trim());
       toast({ title: 'Account Created', description: 'Welcome to Awake Chat!' });
       router.push('/subscribe');
     } catch (error) {
