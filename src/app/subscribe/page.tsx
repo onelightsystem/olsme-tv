@@ -49,13 +49,13 @@ const TIER_COPY: Record<Tier, TierCopy> = {
     title: 'Starter Access',
     button: 'Choose Starter – $0.25/mo',
     features: [
-      "olsme tech sub.",
-      "Random non-video text chat",
+      "Olsme tech subscription",
+      "Random text chat (non-video)",
       "AI politeness score",
-      "Live users access",
-      "real humans only",
-      "market place",
-      "Builds Global Live ID establishment",
+      "Access to live users",
+      "Real humans only",
+      "Marketplace access",
+      "Establishes your Global Live ID",
     ],
     isAnnual: false,
     isPremium: false,
@@ -66,13 +66,13 @@ const TIER_COPY: Record<Tier, TierCopy> = {
     title: 'Starter Annual',
     button: 'Lock Starter – $10\u2009/ year',
     features: [
-      "olsme tech sub.",
-      "Random non-video text chat",
+      "Olsme tech subscription",
+      "Random text chat (non-video)",
       "AI politeness score",
-      "Live users access",
-      "real humans only",
-      "market place",
-      "Builds Global Live ID establishment",
+      "Access to live users",
+      "Real humans only",
+      "Marketplace access",
+      "Establishes your Global Live ID",
     ],
     isAnnual: true,
     isPremium: false,
@@ -82,8 +82,8 @@ const TIER_COPY: Record<Tier, TierCopy> = {
     title: 'Premium Access',
     button: 'Upgrade Now – $1/mo',
     features: [
-      "everything in Starter, plus:",
-      "make money on hosting tv only real live sessions",
+      "Everything in Starter, plus:",
+      "Earn money hosting live TV sessions",
       "Unlimited sessions",
       "Full AI politeness insights",
       "Priority matching",
@@ -97,8 +97,8 @@ const TIER_COPY: Record<Tier, TierCopy> = {
     title: 'Premium Annual',
     button: 'Lock Premium – $30\u2009/ year',
     features: [
-      "everything in Starter, plus:",
-      "make money on hosting tv only real live sessions",
+      "Everything in Starter, plus:",
+      "Earn money hosting live TV sessions",
       "Unlimited sessions",
       "Full AI politeness insights",
       "Priority matching",
@@ -197,7 +197,8 @@ export default function SubscribePage() {
 
     // Map 4-variant frontend tier to backend tier1/tier2 identifier
     const backendTier = tier.startsWith('tier2') ? 'tier2' : 'tier1';
-    // Business logic: annual = one-time payment (not recurring); monthly = recurring subscription
+    // Business logic: both annual and monthly are processed as one-time PayPal payments;
+    // `billingPeriod` is used by the backend to distinguish monthly vs annual access terms.
     const billingPeriod = tier.endsWith('-annual') ? 'annual' : 'monthly';
 
     try {
@@ -403,8 +404,12 @@ export default function SubscribePage() {
                                 purchase_units: [
                                   {
                                     amount: { currency_code: 'USD', value: copy.amount },
-                                    // Business logic: annual = one-time payment (not recurring); monthly = recurring subscription
-                                    description: `olsme.tv ${copy.title} – ${copy.isAnnual ? '12-month plan (one-time)' : 'monthly subscription'}`,
+                                    // Business logic: both annual and monthly are one-time payments (not recurring) via PayPal Orders
+                                    description: `olsme.tv ${copy.title} – ${
+                                      copy.isAnnual
+                                        ? '12-month plan (one-time payment)'
+                                        : '30-day access (one-time, non-recurring)'
+                                    }`,
                                   },
                                 ],
                               });
