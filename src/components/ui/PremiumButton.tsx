@@ -86,12 +86,9 @@ export default function PremiumButton({
                   }) as {data: {orderID: string}};
                   return result.data.orderID;
                 }}
-                onApprove={async (data, actions) => {
-                  if (!actions.order) return;
+                onApprove={async (data) => {
                   try {
-                    // Capture on client side
-                    await actions.order.capture();
-                    // Call backend to finalize payment and set premium claim
+                    // Capture server-side: verifies payment, sets premium claim, updates Firestore
                     const functions = getFunctions();
                     const captureOrder = httpsCallable(functions, 'capturePaypalOrder');
                     await captureOrder({
