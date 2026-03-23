@@ -18,7 +18,7 @@ import { auth, db } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@hooks/use-toast';
 import { metadata } from './metadata';
 import { collection, doc, onSnapshot, writeBatch } from 'firebase/firestore';
@@ -52,6 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const pathname = usePathname();
   const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const userRef = useRef<FirebaseUser | null>(auth.currentUser);
   const [authResolved, setAuthResolved] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const isAdminRoute = (pathname ?? '').startsWith('/admin');
@@ -109,11 +110,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           const {claims} = await u.getIdTokenResult(true); // Force refresh token for custom claims
           debouncedUpdateStatus('online');
           setIsPremium(claims.isPremium === true || claims.subscriptionTier === 'tier2');
-        } else if (user) {
+        } else if (userRef.current && !u) {
           debouncedUpdateStatus('offline');
           setIsPremium(false);
         }
         setUser(u);
+        userRef.current = u;
 
         // Log auth state to Firestore
         const batch = writeBatch(db); // Fresh batch
@@ -166,7 +168,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       window.removeEventListener('beforeunload', handleBeforeUnload);
       debouncedUpdateStatus.cancel();
     };
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (!isAdminRoute) return;
