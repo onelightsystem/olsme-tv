@@ -462,10 +462,8 @@ export default function SubscribePage() {
                               }) as {data: {orderID: string}};
                               return result.data.orderID;
                             }}
-                            onApprove={async (data, actions) => {
-                              if (!actions.order) return;
-                              // Capture on client side, then call backend to finalize
-                              await actions.order.capture();
+                            onApprove={async (data, _actions) => {
+                              // Capture is handled server-side by capturePaypalOrder callable
                               await handleApprove(tier, data.orderID);
                             }}
                           />
