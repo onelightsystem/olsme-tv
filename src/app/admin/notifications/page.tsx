@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
-import { collection, limit, onSnapshot, query } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Bell, Download } from 'lucide-react';
-import { auth, db } from '@lib/firebase/config';
+import { auth } from '@lib/firebase/config';
 import Sidebar from '@components/admin/Sidebar';
 import TopBar from '@components/admin/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@components/ui/card';
@@ -27,21 +27,6 @@ type NotificationRow = {
 const PAGE_SIZE = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    const toDate = (value as { toDate?: () => Date }).toDate;
-    if (typeof toDate === 'function') {
-      return toDate();
-    }
-  }
-  return null;
-}
-
 export default function AdminNotificationsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -58,38 +43,30 @@ export default function AdminNotificationsPage() {
   const [targetUsers, setTargetUsers] = useState('All Users');
 
   useEffect(() => {
-    const notificationsQuery = query(collection(db, 'notifications'), limit(250));
-    const unsubscribe = onSnapshot(
-      notificationsQuery,
-      (snapshot) => {
-        const nextRows = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Record<string, unknown>;
-          const created = parseDate(data.createdAt ?? data.timestamp);
-          return {
-            id: docSnap.id,
-            title: typeof data.title === 'string' ? data.title : 'Untitled notification',
-            message: typeof data.message === 'string' ? data.message : '',
-            targetUsers: typeof data.targetUsers === 'string' ? data.targetUsers : 'All Users',
-            createdAt: created ? created.toISOString() : null,
-          } as NotificationRow;
-        });
+    let cancelled = false;
 
-        nextRows.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
-        });
-
-        setRows(nextRows);
-        setLoading(false);
-      },
-      () => {
-        setRows([]);
-        setLoading(false);
+    const fetchNotifications = async () => {
+      try {
+        const functions = getFunctions();
+        const getNotificationsCallable = httpsCallable<unknown, { notifications: NotificationRow[] }>(functions, 'getNotifications');
+        const result = await getNotificationsCallable({});
+        if (!cancelled) {
+          setRows(result.data.notifications);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setRows([]);
+          setLoading(false);
+        }
       }
-    );
+    };
 
-    return () => unsubscribe();
+    void fetchNotifications();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredRows = useMemo(() => {
