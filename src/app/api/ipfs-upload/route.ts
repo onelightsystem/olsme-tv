@@ -1,3 +1,19 @@
+// ===========================================================
+// TEMPORARY STATIC EXPORT STUB
+// Restore original POST handler when reverting to SSR mode:
+//   1. Remove output: 'export' from next.config.ts
+//   2. Restore firebase.json frameworksBackend block
+//   3. Uncomment the original POST handler below and remove this stub
+// ===========================================================
+export const dynamic = 'force-static';
+export function GET() {
+  return Response.json(
+    { disabled: true, reason: 'IPFS upload endpoint requires SSR. Re-enable frameworksBackend to restore.' },
+    { status: 503 }
+  );
+}
+
+/* ---- ORIGINAL POST HANDLER (restore when switching back to SSR) ----
 // src/app/api/ipfs-upload/route.ts
 // Server-side route that proxies IPFS uploads so credentials never reach the browser.
 import {NextRequest, NextResponse} from 'next/server';
@@ -23,7 +39,13 @@ export async function POST(req: NextRequest) {
 
   const isInfura = /infura\.io/.test(ipfsUrl);
   if (isInfura && !authorization) {
-    return NextResponse.json({error: 'IPFS auth not configured'}, {status: 503});
+    return NextResponse.json(
+      {
+        disabled: true,
+        reason: 'IPFS auth not configured',
+      },
+      {status: 200}
+    );
   }
 
   try {
@@ -57,3 +79,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({error: message}, {status: 500});
   }
 }
+---- END ORIGINAL POST HANDLER ---- */

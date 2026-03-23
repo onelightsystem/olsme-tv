@@ -45,6 +45,15 @@ declare global {
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
+// Log warning if Turnstile is not configured (development fallback).
+const isTurnstileConfigured = !!TURNSTILE_SITE_KEY;
+if (!isTurnstileConfigured && typeof window !== 'undefined') {
+  console.warn(
+    'NEXT_PUBLIC_TURNSTILE_SITE_KEY is not configured. Signup bot verification is disabled. ' +
+    'Set the env var in .env.local for development or in Firebase App Hosting/Vercel secrets for production.'
+  );
+}
+
 const inputClassName =
   'min-h-12 sm:min-h-14 border-white/12 bg-black/30 text-base sm:text-lg text-white placeholder:text-white/30 focus-visible:border-[#FFD700]/45 focus-visible:ring-2 focus-visible:ring-[#FFD700]/30';
 
@@ -117,6 +126,7 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
     setErrorMessage(null);
 
     try {
+      // Step 1: Verify Turnstile token (if configured) BEFORE handling credentials
       if (TURNSTILE_SITE_KEY) {
         const token = turnstileToken || (await requestTurnstileToken());
         if (!token) {
@@ -129,15 +139,11 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
           return;
         }
 
+        // Send ONLY the Turnstile token for verification, not credentials
         const verifyResponse = await fetch('/api/verify-turnstile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: signUpEmail.trim(),
-            password: signUpPassword,
-            name: displayName.trim(),
-            turnstileToken: token,
-          }),
+          body: JSON.stringify({ turnstileToken: token }),
         });
 
         if (!verifyResponse.ok) {
@@ -153,6 +159,7 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
         }
       }
 
+      // Step 2: Only after successful Turnstile verification, create account
       await signUpWithEmail(signUpEmail.trim(), signUpPassword, displayName.trim());
       toast({ title: 'Account Created', description: 'Welcome to Awake Chat!' });
       router.push('/subscribe');

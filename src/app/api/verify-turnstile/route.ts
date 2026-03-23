@@ -1,3 +1,19 @@
+// ===========================================================
+// TEMPORARY STATIC EXPORT STUB
+// Restore original POST handler when reverting to SSR mode:
+//   1. Remove output: 'export' from next.config.ts
+//   2. Restore firebase.json frameworksBackend block
+//   3. Uncomment original POST handler below and remove this stub
+// ===========================================================
+export const dynamic = 'force-static';
+export function GET() {
+  return Response.json(
+    { disabled: true, reason: 'Turnstile endpoint requires SSR. Re-enable frameworksBackend to restore.' },
+    { status: 503 }
+  );
+}
+
+/* ---- ORIGINAL POST HANDLER (restore when switching back to SSR) ----
 import {NextResponse} from 'next/server';
 
 type VerifyTurnstileResponse = {
@@ -13,10 +29,20 @@ type VerifyTurnstileRequestBody = {
 
 export async function POST(request: Request) {
   try {
-    const {turnstileToken} = (await request.json()) as VerifyTurnstileRequestBody;
+    const requestBody = (await request.json()) as Record<string, unknown> & VerifyTurnstileRequestBody;
+    const {turnstileToken} = requestBody;
 
     if (!turnstileToken) {
       return NextResponse.json({error: 'Verification failed'}, {status: 400});
+    }
+
+    // Security: Only accept turnstileToken; reject if credentials are in body.
+    // This prevents credential leakage to the verify endpoint.
+    if (requestBody.email || requestBody.password || requestBody.name) {
+      return NextResponse.json(
+        {error: 'Invalid request: credentials must not be sent to this endpoint'},
+        {status: 400}
+      );
     }
 
     const secret = process.env.TURNSTILE_SECRET_KEY;
@@ -55,3 +81,4 @@ export async function POST(request: Request) {
     return NextResponse.json({error: 'Verification failed'}, {status: 400});
   }
 }
+---- END ORIGINAL POST HANDLER ---- */

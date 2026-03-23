@@ -6,6 +6,9 @@
 // - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // TEMPORARY: static export mode while SSR Cloud Run deploy is blocked (409 bug).
+  // To revert to SSR: remove this line and restore firebase.json frameworksBackend block.
+  output: 'export',
   turbopack: {},
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)

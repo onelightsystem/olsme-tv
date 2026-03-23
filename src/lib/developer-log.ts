@@ -7,6 +7,18 @@ export type LogEntry = {
 
 export const developerLogEntries: LogEntry[] = [
   {
+    date: new Date('2026-03-22'),
+    title: 'v0.4.1 - Subscription Cards & Lockable Deals Live',
+    description:
+      'Version 0.4.1 ships with refreshed subscription cards on the landing page.\n\n' +
+      'We now offer three tiers:\n' +
+      '- Entry Key - $0.10/month (recurring, low-barrier onboarding: verified Global Live ID, live hosts directory access, viewer-only Host TV watching)\n' +
+      '- Starter Access - $0.25/month or lock $10/year\n' +
+      '- Premium Access - $1/month or lock $30/year\n\n' +
+      'Early adopters can lock annual deals at these rates - first come, first served. Once claimed, these historical prices stay tied to your account even if we adjust plans later. This rewards fast action and builds long-term community trust.\n\n' +
+      '[Screenshot of current landing page with 3 cards]',
+  },
+  {
     date: new Date('2026-03-17'),
     title: 'Premium subscription button & PayPal integration added',
     description:

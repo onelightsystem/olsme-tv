@@ -7,6 +7,9 @@ import {
   PayPalScriptProvider,
   type ReactPayPalScriptOptions,
 } from '@paypal/react-paypal-js';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { useToast } from '@hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 type PremiumButtonProps = {
   amount?: string;
@@ -21,6 +24,8 @@ export default function PremiumButton({
 }: PremiumButtonProps) {
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
   const isPaypalMisconfigured = !paypalClientId && process.env.NODE_ENV === 'production';
+  const { toast } = useToast();
+  const router = useRouter();
 
   if (isPaypalMisconfigured) {
     console.error('NEXT_PUBLIC_PAYPAL_CLIENT_ID is not set. PayPal checkout is disabled.');
@@ -70,23 +75,39 @@ export default function PremiumButton({
               <PayPalButtons
                 style={{ layout: 'horizontal', label: 'paypal', height: 48 }}
                 forceReRender={[amount, currency]}
-                createOrder={(_data, actions) => {
-                  return actions.order.create({
-                    intent: 'CAPTURE',
-                    purchase_units: [
-                      {
-                        amount: {
-                          currency_code: currency,
-                          value: amount,
-                        },
-                        description: 'OLS Premium Monthly Plan',
-                      },
-                    ],
-                  });
+                createOrder={async (_data, actions) => {
+                  // Call backend to create PayPal order server-side
+                  const functions = getFunctions();
+                  const createOrder = httpsCallable(functions, 'createPaypalOrder');
+                  const result = await createOrder({
+                    amount,
+                    tier: 'tier2',
+                    period: 'monthly',
+                  }) as {data: {orderID: string}};
+                  return result.data.orderID;
                 }}
-                onApprove={async (_data, actions) => {
+                onApprove={async (data, actions) => {
                   if (!actions.order) return;
-                  await actions.order.capture();
+                  try {
+                    // Capture on client side
+                    await actions.order.capture();
+                    // Call backend to finalize payment and set premium claim
+                    const functions = getFunctions();
+                    const captureOrder = httpsCallable(functions, 'capturePaypalOrder');
+                    await captureOrder({
+                      orderId: data.orderID,
+                      tier: 'tier2',
+                      period: 'monthly',
+                    });
+                    toast({ title: 'Premium activated', description: 'Your premium access is now active.' });
+                    router.push('/');
+                  } catch (error) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Error',
+                      description: error instanceof Error ? error.message : 'Payment failed. Please try again.',
+                    });
+                  }
                 }}
               />
             </motion.div>
