@@ -6,11 +6,20 @@
 //   3. Uncomment original POST handler below and remove this stub
 // ===========================================================
 export const dynamic = 'force-static';
+
+const DISABLED_RESPONSE = {
+  disabled: true,
+  reason: 'Turnstile endpoint requires SSR. Re-enable frameworksBackend to restore.',
+};
+
 export function GET() {
-  return Response.json(
-    { disabled: true, reason: 'Turnstile endpoint requires SSR. Re-enable frameworksBackend to restore.' },
-    { status: 503 }
-  );
+  return Response.json(DISABLED_RESPONSE, { status: 503 });
+}
+
+// POST stub: returns disabled response so clients can detect static-export mode
+// and skip Turnstile verification gracefully instead of receiving a 404/405.
+export function POST() {
+  return Response.json(DISABLED_RESPONSE, { status: 503 });
 }
 
 /* ---- ORIGINAL POST HANDLER (restore when switching back to SSR) ----
