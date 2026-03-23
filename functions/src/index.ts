@@ -10,7 +10,7 @@ import * as functions from "firebase-functions/v2";
 import * as functionsV1 from "firebase-functions/v1";
 import {initializeApp} from "firebase-admin/app";
 import {getAuth, UserRecord} from "firebase-admin/auth";
-import {FieldValue, getFirestore} from "firebase-admin/firestore";
+import {FieldValue, getFirestore, QueryDocumentSnapshot, DocumentData} from "firebase-admin/firestore";
 import {CallableRequest, onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 
@@ -555,6 +555,40 @@ export const getAllUsers = onCall({cors: callableCorsOrigins}, async (request: C
   } catch (error) {
     functions.logger.error("Error fetching all users:", error);
     throw new HttpsError("internal", "Failed to fetch users.");
+  }
+});
+
+export const getVerificationQueue = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth?.token.isAdmin) {
+    throw new HttpsError("permission-denied", "Must be an admin to access verification data.");
+  }
+  try {
+    const usersSnapshot = await db.collection("users").limit(250).get();
+    const users = usersSnapshot.docs.map((document: QueryDocumentSnapshot<DocumentData>) => {
+      const data = document.data();
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null;
+      const verificationLevel = typeof data.verificationLevel === "string" ? data.verificationLevel : "level1";
+      const pendingVerificationLevel = typeof data.pendingVerificationLevel === "string" ? data.pendingVerificationLevel : null;
+      return {
+        id: document.id,
+        displayName: typeof data.displayName === "string" ? data.displayName : "Unknown user",
+        email: typeof data.email === "string" ? data.email : "No email",
+        verificationLevel,
+        pendingVerificationLevel,
+        createdAt,
+      };
+    });
+    await db.collection("logs").add({
+      userId: auth.uid,
+      action: "getVerificationQueue",
+      resultsCount: users.length,
+      timestamp: FieldValue.serverTimestamp(),
+    });
+    return {users};
+  } catch (error) {
+    functions.logger.error("Error fetching verification queue:", error);
+    throw new HttpsError("internal", "Failed to fetch verification queue.");
   }
 });
 
