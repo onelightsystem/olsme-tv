@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Crown, Lock, CheckCircle, Sun } from 'lucide-react';
+import { Crown, Lock, CheckCircle, Sun, Key, ShieldCheck, ArrowRight } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -21,12 +21,13 @@ import { Badge } from '@components/ui/badge';
 // TODO: move prices to Firebase Remote Config or .env for admin changes without redeploy
 // Current monthly: Starter $0.25, Premium $1. Monthly can change anytime.
 // Annual = one-time payment for 12 months (not recurring). Fixed "deal lock" against future monthly increases.
+const ENTRY_KEY_MONTHLY_PRICE = '0.10';
 const STARTER_MONTHLY_PRICE = '0.25';
 const PREMIUM_MONTHLY_PRICE = '1.00';
 const STARTER_ANNUAL_PRICE = '10.00'; // one-time deal lock – 12 months
 const PREMIUM_ANNUAL_PRICE = '30.00'; // one-time deal lock – 12 months
 
-type Tier = 'tier1-monthly' | 'tier1-annual' | 'tier2-monthly' | 'tier2-annual';
+type Tier = 'entry-key' | 'tier1-monthly' | 'tier1-annual' | 'tier2-monthly' | 'tier2-annual';
 
 type ProfileView = {
   name: string;
@@ -44,6 +45,20 @@ type TierCopy = {
 };
 
 const TIER_COPY: Record<Tier, TierCopy> = {
+  'entry-key': {
+    amount: ENTRY_KEY_MONTHLY_PRICE,
+    title: 'Entry Key',
+    button: 'Choose Entry Key – $0.10/mo',
+    features: [
+      'Verified Global Live ID',
+      'Access to live hosts directory',
+      'Watch Host TV sessions (viewer only)',
+      'Basic AI politeness badge',
+      'Real humans access',
+    ],
+    isAnnual: false,
+    isPremium: false,
+  },
   'tier1-monthly': {
     amount: STARTER_MONTHLY_PRICE,
     title: 'Starter Access',
@@ -113,6 +128,7 @@ export default function SubscribePage() {
   const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<ProfileView | null>(null);
+  const [hasPaidSubscription, setHasPaidSubscription] = useState(false);
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   // Controls which billing period is shown. Switching resets any open PayPal panel.
@@ -129,18 +145,32 @@ export default function SubscribePage() {
         }
 
         setUser(currentUser);
+        setHasPaidSubscription(false);
         unsubscribeUserDoc?.();
+
+        // Claims are server-set and give the earliest view of paid access.
+        try {
+          const idTokenResult = await currentUser.getIdTokenResult(true); // Force refresh
+          const claims = idTokenResult.claims as Record<string, unknown>;
+          const claimTier = typeof claims.subscriptionTier === 'string' ? claims.subscriptionTier : '';
+          const claimHasPaidSubscription = claims?.isPremium === true || ['entry-key', 'tier1', 'tier2'].includes(claimTier);
+          setHasPaidSubscription(claimHasPaidSubscription);
+        } catch (claimsError) {
+          console.warn('Failed to read custom claims:', claimsError);
+          // Fall through; Firestore snapshot will still handle the page if claims check fails.
+        }
+
         unsubscribeUserDoc = onSnapshot(doc(db, 'users', currentUser.uid), (docSnap) => {
           const userData = docSnap.exists() ? (docSnap.data() as Record<string, unknown>) : {};
-          const hasPremiumAccess =
-            userData?.isPremium === true ||
-            userData?.subscriptionTier === 'tier2' ||
-            userData?.subscriptionStatus === 'active';
+          const packageName = typeof userData.package === 'string' ? userData.package : '';
+          const subscriptionTier = typeof userData.subscriptionTier === 'string' ? userData.subscriptionTier : '';
+          const hasActiveSubscription =
+            userData.isPremium === true ||
+            userData.subscriptionStatus === 'active' ||
+            ['entry', 'starter', 'premium'].includes(packageName) ||
+            ['entry-key', 'tier1', 'tier2'].includes(subscriptionTier);
 
-          if (hasPremiumAccess) {
-            router.replace('/');
-            return;
-          }
+          setHasPaidSubscription((currentValue) => currentValue || hasActiveSubscription);
 
           setProfile({
             name:
@@ -161,6 +191,7 @@ export default function SubscribePage() {
             email: currentUser.email || 'No email provided',
             liveId: currentUser.uid,
           });
+          setHasPaidSubscription(false);
         }
       }
     });
@@ -192,20 +223,27 @@ export default function SubscribePage() {
     [paypalClientId]
   );
 
-  const handleApprove = async (tier: Tier, orderId: string | undefined) => {
-    if (!user) return;
+  const mapToBackendTier = (tier: Tier): 'tier1' | 'tier2' => (tier.startsWith('tier2') ? 'tier2' : 'tier1');
+  const mapToBillingPeriod = (tier: Tier): 'monthly' | 'annual' => (tier.endsWith('-annual') ? 'annual' : 'monthly');
 
-    // Map 4-variant frontend tier to backend tier1/tier2 identifier
-    const backendTier = tier.startsWith('tier2') ? 'tier2' : 'tier1';
-    // Business logic: both annual and monthly are processed as one-time PayPal payments;
-    // `billingPeriod` is used by the backend to distinguish monthly vs annual access terms.
-    const billingPeriod = tier.endsWith('-annual') ? 'annual' : 'monthly';
+  const handleApprove = async (tier: Tier, orderId: string | undefined) => {
+    if (!user || !orderId) return;
+
+    // Backend currently accepts tier1/tier2. Entry Key maps to tier1 monthly server-side.
+    const backendTier = mapToBackendTier(tier);
+    const billingPeriod = mapToBillingPeriod(tier);
 
     try {
       setIsUpdating(true);
       const functions = getFunctions();
-      const updateSubscriptionStatus = httpsCallable(functions, 'updateSubscriptionStatus');
-      await updateSubscriptionStatus({ tier: backendTier, paypalOrderId: orderId ?? null, billingPeriod });
+
+      // Capture the PayPal order server-side (verifies payment, sets premium claim)
+      const capturePaypalOrder = httpsCallable(functions, 'capturePaypalOrder');
+      await capturePaypalOrder({
+        orderId,
+        tier: backendTier,
+        period: billingPeriod,
+      });
 
       toast({ title: 'Subscription active', description: 'Your mindful access has been unlocked.' });
       router.push('/');
@@ -246,11 +284,17 @@ export default function SubscribePage() {
             <div className="rounded-full bg-[#FFD700]/15 p-2">
               <Sun className="h-5 w-5 text-[#FFD700]" />
             </div>
-            <Badge className="bg-[#FFD700]/20 text-[#FFE7A0] hover:bg-[#FFD700]/20">Restricted Mode</Badge>
+            <Badge className="bg-[#FFD700]/20 text-[#FFE7A0] hover:bg-[#FFD700]/20">
+              {hasPaidSubscription ? 'Subscription Active' : 'Restricted Mode'}
+            </Badge>
           </div>
-          <h1 className="mt-4 text-2xl font-bold sm:text-3xl">Subscription Required</h1>
+          <h1 className="mt-4 text-2xl font-bold sm:text-3xl">
+            {hasPaidSubscription ? 'Your Mindful Access Is Active' : 'Subscription Required'}
+          </h1>
           <p className="mt-2 text-white/80">
-            Your account is in pending mode. Subscribe to unlock full mindful video/text chat.
+            {hasPaidSubscription
+              ? 'Your paid access is live. Verification Step 2 is ready below whenever you want to complete it.'
+              : 'Your account is in pending mode. Subscribe to unlock full mindful video and text chat.'}
           </p>
 
           <div className="mt-6 grid gap-3 rounded-xl border border-white/15 bg-black/25 p-4 sm:grid-cols-3">
@@ -298,16 +342,17 @@ export default function SubscribePage() {
             </span>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
             {isPaypalMisconfigured && (
               <div className="col-span-full rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
                 Payment checkout is currently unavailable. Please contact support.
               </div>
             )}
-            {(['tier1', 'tier2'] as const).map((base, index) => {
-              // Derive the full tier key from billing period state
-              const tier: Tier = isAnnual ? `${base}-annual` : `${base}-monthly`;
+            {(['entry-key', 'tier1', 'tier2'] as const).map((base, index) => {
+              // Entry Key always stays monthly; Starter/Premium follow monthly/annual switch.
+              const tier: Tier = base === 'entry-key' ? 'entry-key' : (isAnnual ? `${base}-annual` : `${base}-monthly`);
               const copy = TIER_COPY[tier];
+              const isEntryKey = tier === 'entry-key';
               return (
                 <motion.div
                   key={tier}
@@ -333,11 +378,17 @@ export default function SubscribePage() {
                   </AnimatePresence>
                   <Card className={copy.isPremium
                     ? 'h-full rounded-2xl border border-[#FFD700]/35 bg-[rgba(17,17,17,0.84)] shadow-[0_0_30px_rgba(255,215,0,0.12)]'
-                    : 'h-full rounded-2xl border border-white/20 bg-[rgba(17,17,17,0.78)]'}
+                    : 'h-full rounded-2xl border border-white/30 bg-[rgba(17,17,17,0.82)]'}
                   >
                     <CardContent className="p-6 sm:p-7">
                       <div className="flex items-center gap-2">
-                        {copy.isPremium ? <Crown className="h-5 w-5 text-[#FFD700]" /> : <Lock className="h-5 w-5 text-white/75" />}
+                        {isEntryKey ? (
+                          <Key className="h-5 w-5 text-white/85" />
+                        ) : copy.isPremium ? (
+                          <Crown className="h-5 w-5 text-[#FFD700]" />
+                        ) : (
+                          <Lock className="h-5 w-5 text-white/75" />
+                        )}
                         <h2 className="text-xl font-semibold text-white">{copy.title}</h2>
                       </div>
 
@@ -377,13 +428,15 @@ export default function SubscribePage() {
 
                       {/* Annual CTA gets stronger scale pulse on hover */}
                       <motion.div
-                        whileHover={{ scale: copy.isAnnual ? 1.04 : 1.01 }}
+                        whileHover={{ scale: isEntryKey ? 1.02 : (copy.isAnnual ? 1.04 : 1.01) }}
                         transition={{ type: 'spring', stiffness: 300, damping: 18 }}
                       >
                         <Button
                           type="button"
                           onClick={() => setSelectedTier(tier)}
-                          className="mt-6 min-h-12 w-full bg-gradient-to-r from-[#FFD700] to-[#FFAA00] font-bold text-[#0F0F0F] hover:shadow-[0_0_18px_rgba(255,215,0,0.4)]"
+                          className={isEntryKey
+                            ? 'mt-6 min-h-12 w-full bg-gradient-to-r from-white/20 to-[#FFD700]/30 font-semibold text-white hover:opacity-90 hover:shadow-[0_0_12px_rgba(255,215,0,0.2)]'
+                            : 'mt-6 min-h-12 w-full bg-gradient-to-r from-[#FFD700] to-[#FFAA00] font-bold text-[#0F0F0F] hover:shadow-[0_0_18px_rgba(255,215,0,0.4)]'}
                         >
                           {copy.button}
                         </Button>
@@ -398,25 +451,19 @@ export default function SubscribePage() {
                             style={{ layout: 'vertical', label: 'paypal', height: 48 }}
                             forceReRender={[copy.amount, tier]}
                             disabled={isUpdating}
-                            createOrder={(_data, actions) => {
-                              return actions.order.create({
-                                intent: 'CAPTURE',
-                                purchase_units: [
-                                  {
-                                    amount: { currency_code: 'USD', value: copy.amount },
-                                    // Business logic: both annual and monthly are one-time payments (not recurring) via PayPal Orders
-                                    description: `olsme.tv ${copy.title} – ${
-                                      copy.isAnnual
-                                        ? '12-month plan (one-time payment)'
-                                        : '30-day access (one-time, non-recurring)'
-                                    }`,
-                                  },
-                                ],
-                              });
+                            createOrder={async (_data, actions) => {
+                              // Call backend to create PayPal order server-side
+                              const functions = getFunctions();
+                              const createOrder = httpsCallable(functions, 'createPaypalOrder');
+                              const result = await createOrder({
+                                amount: copy.amount,
+                                tier: mapToBackendTier(tier),
+                                period: mapToBillingPeriod(tier),
+                              }) as {data: {orderID: string}};
+                              return result.data.orderID;
                             }}
-                            onApprove={async (data, actions) => {
-                              if (!actions.order) return;
-                              await actions.order.capture();
+                            onApprove={async (data, _actions) => {
+                              // Capture is handled server-side by capturePaypalOrder callable
                               await handleApprove(tier, data.orderID);
                             }}
                           />
@@ -429,6 +476,46 @@ export default function SubscribePage() {
               );
             })}
           </div>
+
+          {hasPaidSubscription && (
+            <motion.section
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut', delay: 0.18 }}
+              className="mt-8 overflow-hidden rounded-[28px] border border-[#FFD700]/28 bg-[linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,255,255,0.03))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-8"
+            >
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/25 bg-black/25 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#FFE7A0]">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Verification Step 2
+                  </div>
+                  <h2 className="mt-4 text-2xl font-bold text-white sm:text-3xl">Become Fully Verified</h2>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-white/80 sm:text-base">
+                    Finish your profile verification to unlock stronger trust signals across olsme.tv. After completing Step 2, you can request KYC later from your profile.
+                  </p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.14em] text-white/45">
+                    Add your real name, country, profile image, and social links.
+                  </p>
+                </div>
+
+                <div className="flex w-full max-w-sm flex-col gap-3 rounded-3xl border border-white/10 bg-black/20 p-4 backdrop-blur-md">
+                  <p className="text-sm font-semibold text-[#FFE7A0]">Next step after subscribing</p>
+                  <p className="text-sm text-white/75">
+                    Go to your profile and complete the verification checklist.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={() => router.push('/profile#verification')}
+                    className="min-h-12 w-full bg-gradient-to-r from-[#FFD700] to-[#FFAA00] font-bold text-[#0F0F0F] hover:shadow-[0_0_18px_rgba(255,215,0,0.36)]"
+                  >
+                    Go to Verification Step 2
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </motion.section>
+          )}
         </PayPalScriptProvider>
       </div>
     </main>

@@ -3,13 +3,16 @@
 ├── components.json
 ├── docs
 │   ├── blueprint.md
+│   ├── PAYPAL_LIVE_INTEGRATION.md
 │   ├── project-tree.md
+│   ├── SECURITY_HARDENING.md
 │   └── security.md
 ├── eslint.config.js
 ├── firebase.json
 ├── firestore.rules
 ├── functions
 │   ├── eslint.config.js
+│   ├── functions.yaml
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── src
@@ -20,6 +23,10 @@
 ├── next.config.ts
 ├── package-lock.json
 ├── package.json
+├── PAYPAL_CODE_REFERENCE.md
+├── PAYPAL_DEPLOYMENT_SUMMARY.md
+├── PAYPAL_INTEGRATION_COMPLETE.md
+├── PAYPAL_QUICK_REFERENCE.md
 ├── postcss.config.mjs
 ├── README.md
 ├── src
@@ -34,7 +41,18 @@
 │   │   │   └── page.tsx
 │   │   ├── admin
 │   │   │   └── users
+│   │   │       ├── logs
+│   │   │       │   └── page.tsx
 │   │   │       └── page.tsx
+│   │   ├── api
+│   │   │   ├── ipfs
+│   │   │   │   └── route.ts
+│   │   │   ├── ipfs-upload
+│   │   │   │   └── route.ts
+│   │   │   └── verify-turnstile
+│   │   │       └── route.ts
+│   │   ├── dev-log
+│   │   │   └── page.tsx
 │   │   ├── favicon.ico
 │   │   ├── globals.css
 │   │   ├── layout.tsx
@@ -42,14 +60,26 @@
 │   │   ├── page.tsx
 │   │   ├── profile
 │   │   │   └── page.tsx
-│   │   └── search
+│   │   ├── search
+│   │   │   └── page.tsx
+│   │   └── subscribe
 │   │       └── page.tsx
 │   ├── components
+│   │   ├── auth
+│   │   │   ├── auth-modal.tsx
+│   │   │   ├── auth-signup-form.tsx
+│   │   │   └── auth-signup-modal.tsx
 │   │   ├── chat
 │   │   │   ├── chat-controls.tsx
 │   │   │   ├── chat-panel.tsx
+│   │   │   ├── login-modal.tsx
 │   │   │   ├── video-player.tsx
 │   │   │   └── waiting-screen.tsx
+│   │   ├── DeveloperLogTimeline.tsx
+│   │   ├── Header.tsx
+│   │   ├── landing
+│   │   │   ├── landing-signup-form.tsx
+│   │   │   └── subscription-cards.tsx
 │   │   ├── layout
 │   │   │   └── header.tsx
 │   │   └── ui
@@ -72,6 +102,7 @@
 │   │       ├── label.tsx
 │   │       ├── menubar.tsx
 │   │       ├── popover.tsx
+│   │       ├── PremiumButton.tsx
 │   │       ├── progress.tsx
 │   │       ├── radio-group.tsx
 │   │       ├── scroll-area.tsx
@@ -95,4 +126,4 @@
 ├── tsconfig.json
 └── tsconfig.tsbuildinfo
 
-18 directories, 78 files
+27 directories, 100 files

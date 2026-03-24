@@ -36,6 +36,10 @@ Keywords: debug, fix error, typecheck fail, tsconfig, firebase error, audit, vul
 - Include `npm run build` for Next.js routing/layout/server-component changes, even if typecheck passes.
 - Report what was validated and what remains (if anything).
 
+5. Keep Documentation in Sync (when touched)
+- If the task includes security/blueprint/status docs, verify each "done" statement against code and config.
+- Avoid documenting route gates as complete unless the route exists and enforcement is implemented.
+
 ## Repository-Specific Tips
 
 - App and Functions are separate TypeScript contexts; verify both when touching shared contracts.
@@ -57,6 +61,7 @@ Keywords: debug, fix error, typecheck fail, tsconfig, firebase error, audit, vul
 	- GA cookie overwrite logs.
 	- Firestore `NS_BINDING_ABORTED` on channel requests.
 	- preload-not-used font warnings during HMR.
+	- CSS parser warnings like dropped `-webkit-text-size-adjust` or `opacity` values during hot reload.
 
 ## Output Expectations
 

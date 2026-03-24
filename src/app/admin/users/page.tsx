@@ -1,332 +1,280 @@
-// Path: src/app/admin/users/page.tsx
-// Improvements (Sept 30, 2025):
-// - Added premium user check for enhanced visuals (freemium model, $4.99/month).
-// - Added IPFS logging for admin actions (anti-censorship).
-// - Added biofeedback audio trigger for admin actions (OLS mindfulness).
-// - Optimized Firestore writes with batching and retry logic.
-// - Enhanced ARIA attributes for accessibility (GDPR compliance).
-// - Aligned with blueprint: Admin dashboard, Firebase Cloud Functions, IPFS logging.
-// - Solo Tip: Test with `npm run dev`, visit `/admin/users` as admin, check Firestore `logs`/`biofeedback_events`, IPFS CID.
 'use client';
-import { useEffect, useState, useMemo } from 'react';
-import { auth, db } from '@lib/firebase/config';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useToast } from '@hooks/use-toast';
-import { User as FirebaseUser } from 'firebase/auth';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@components/ui/card';
-import { Badge } from '@components/ui/badge';
-import { Input } from '@components/ui/input';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem } from '@components/ui/dropdown-menu';
-import { Button } from '@components/ui/button';
-import { format } from 'date-fns';
-import { Skeleton } from '@components/ui/skeleton';
-import { ShieldAlert, Users, CircleDot, Gem } from 'lucide-react';
-import { logToIPFS } from '@lib/ipfs-client';
-import { triggerBiofeedback, formatErrorLog } from '@lib/utils';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { cn } from '@lib/utils';
 
-type UserData = {
-  uid: string;
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { Download, Users, UserPlus } from 'lucide-react';
+import { auth } from '@lib/firebase/config';
+import Sidebar from '@components/admin/Sidebar';
+import TopBar from '@components/admin/TopBar';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@components/ui/card';
+import { Badge } from '@components/ui/badge';
+import { Button } from '@components/ui/button';
+import { Input } from '@components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table';
+import { useToast } from '@hooks/use-toast';
+
+type AdminUser = {
+  id: string;
   displayName: string;
   email: string;
-  phoneNumber?: string;
-  package: 'free' | 'premium';
-  verificationLevel: 'level1' | 'level2' | 'level3';
-  politenessScore: { ethical: number; communication: number; listener: number; topics: number };
-  olsPoints: number;
-  location?: string;
-  age?: number;
-  createdAt: string;
-  status: 'online' | 'offline';
+  package: string;
+  verificationLevel: string;
+  createdAt: string | null;
 };
 
-const verificationLevelText = {
-  level1: 'Level 1',
-  level2: 'Level 2',
-  level3: 'Level 3',
-};
+const PAGE_SIZE = 10;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Retry logic for Firestore writes
-async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
-  let attempts = 0;
-  while (attempts < maxAttempts) {
-    try {
-      return await operation();
-    } catch (e) {
-      attempts++;
-      if (attempts === maxAttempts) throw e;
-      await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
-    }
-  }
-  throw new Error('Firestore retry limit reached');
-}
+type GetAllUsersResult = { users: Array<Record<string, unknown>> };
 
 export default function AdminUsersPage() {
-  const [adminUser, setAdminUser] = useState<FirebaseUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [allUsers, setAllUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    uid: true,
-    displayName: true,
-    email: true,
-    package: true,
-    verificationLevel: true,
-    politeness: true,
-    status: true,
-    createdAt: true,
-  });
+  const router = useRouter();
   const { toast } = useToast();
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newArrivalsOnly, setNewArrivalsOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      setAdminUser(user);
-      if (user) {
-        const tokenResult = await user.getIdTokenResult();
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        if (tokenResult.claims.isAdmin) {
-          setIsAdmin(true);
-          try {
-            const batch = writeBatch(db);
-            batch.set(doc(collection(db, 'logs')), {
-              userId: user.uid,
-              context: 'admin_dashboard_access',
-              timestamp: new Date(),
-            });
-            batch.set(doc(collection(db, 'biofeedback_events')), {
-              userId: user.uid,
-              type: 'admin_access',
-              value: 1,
-              timestamp: new Date(),
-            });
-            await withFirestoreRetry(() => batch.commit());
+    const functions = getFunctions();
+    const getAllUsers = httpsCallable<unknown, GetAllUsersResult>(functions, 'getAllUsers');
 
-            await logToIPFS({
-              userId: user.uid,
-              action: 'admin_dashboard_access',
-              premium: isPremium,
-              timestamp: new Date().toISOString(),
-            });
+    getAllUsers()
+      .then((result) => {
+        const mapped = result.data.users.map((userData) => {
+          return {
+            id: typeof userData.id === 'string' ? userData.id : '',
+            displayName: typeof userData.displayName === 'string' ? userData.displayName : 'Unknown user',
+            email: typeof userData.email === 'string' ? userData.email : 'No email',
+            package: typeof userData.package === 'string' ? userData.package : 'free',
+            verificationLevel: typeof userData.verificationLevel === 'string' ? userData.verificationLevel : 'level1',
+            createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : null,
+          } as AdminUser;
+        });
 
-            // Mindfulness: Trigger calming audio for premium users
-            if (isPremium) {
-              await triggerBiofeedback(user.uid, 'chat', 'https://olsme.com/assets/premium-waves.mp3');
-            }
-          } catch (e: any) {
-            const batch = writeBatch(db);
-            batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'admin_dashboard_access', user.uid));
-            batch.set(doc(collection(db, 'biofeedback_events')), {
-              userId: user.uid,
-              type: 'error',
-              value: 0,
-              timestamp: new Date(),
-            });
-            await withFirestoreRetry(() => batch.commit());
+        mapped.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
 
-            await logToIPFS({
-              error: e.message,
-              context: 'admin_dashboard_access',
-              userId: user.uid,
-              action: 'error',
-              timestamp: new Date().toISOString(),
-            });
-
-            await triggerBiofeedback(user.uid, 'chat');
-          }
-        } else {
-          setIsAdmin(false);
-          setLoading(false);
-        }
-      } else {
-        setIsAdmin(false);
+        setUsers(mapped);
         setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, [isPremium]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      const functions = getFunctions();
-      const getAllUsers = httpsCallable(functions, 'getAllUsers');
-      getAllUsers()
-        .then((result: any) => {
-          setAllUsers(result.data.users);
-        })
-        .catch((error: any) => {
-          const batch = writeBatch(db);
-          batch.set(doc(collection(db, 'logs')), formatErrorLog(error, 'getAllUsers', adminUser?.uid || 'anonymous'));
-          batch.set(doc(collection(db, 'biofeedback_events')), {
-            userId: adminUser?.uid || 'anonymous',
-            type: 'error',
-            value: 0,
-            timestamp: new Date(),
-          });
-          withFirestoreRetry(() => batch.commit());
-
-          logToIPFS({
-            error: error.message,
-            context: 'getAllUsers',
-            userId: adminUser?.uid || 'anonymous',
-            action: 'error',
-            timestamp: new Date().toISOString(),
-          });
-
-          toast({
-            variant: 'destructive',
-            title: 'Error Fetching Users',
-            description: error.message,
-            id: 'fetch-users-error',
-          });
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [isAdmin, toast, adminUser]);
+      })
+      .catch(() => {
+        setUsers([]);
+        setLoading(false);
+      });
+  }, []);
 
   const filteredUsers = useMemo(() => {
-    const onlineUsers = allUsers.filter(u => u.status === 'online');
-    const pendingVerification = allUsers.filter(u => u.verificationLevel !== 'level3');
-    const filterText = filter.toLowerCase();
-    const applyFilter = (users: UserData[]) => users.filter(user =>
-      user.displayName?.toLowerCase().includes(filterText) ||
-      user.email?.toLowerCase().includes(filterText) ||
-      user.uid.toLowerCase().includes(filterText)
-    );
-    return {
-      all: applyFilter(allUsers),
-      online: applyFilter(onlineUsers),
-      pending: applyFilter(pendingVerification),
-    };
-  }, [allUsers, filter]);
+    const now = Date.now();
+    const queryText = searchQuery.trim().toLowerCase();
 
-  const renderUserTable = (users: UserData[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {visibleColumns.uid && <TableHead>UID</TableHead>}
-          {visibleColumns.displayName && <TableHead>Display Name</TableHead>}
-          {visibleColumns.email && <TableHead>Email</TableHead>}
-          {visibleColumns.package && <TableHead>Package</TableHead>}
-          {visibleColumns.verificationLevel && <TableHead>Verification</TableHead>}
-          {visibleColumns.politeness && <TableHead>Politeness</TableHead>}
-          {visibleColumns.status && <TableHead>Status</TableHead>}
-          {visibleColumns.createdAt && <TableHead>Created At</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {users.length > 0 ? (
-          users.map((user) => {
-            const avgPoliteness = Math.round((user.politenessScore.ethical + user.politenessScore.communication + user.politenessScore.listener + user.politenessScore.topics) / 4);
-            return (
-              <TableRow key={user.uid}>
-                {visibleColumns.uid && <TableCell className="font-mono text-xs">{user.uid}</TableCell>}
-                {visibleColumns.displayName && <TableCell>{user.displayName}</TableCell>}
-                {visibleColumns.email && <TableCell>{user.email}</TableCell>}
-                {visibleColumns.package && (
-                  <TableCell>
-                    <Badge variant={user.package === 'premium' ? 'default' : 'secondary'}>
-                      {user.package}
-                      {user.package === 'premium' && <Gem className="ml-1 h-4 w-4" aria-hidden="true" />}
-                    </Badge>
-                  </TableCell>
-                )}
-                {visibleColumns.verificationLevel && <TableCell>{verificationLevelText[user.verificationLevel]}</TableCell>}
-                {visibleColumns.politeness && <TableCell>{avgPoliteness}</TableCell>}
-                {visibleColumns.status && (
-                  <TableCell>
-                    <Badge variant={user.status === 'online' ? 'outline' : 'destructive'}>{user.status}</Badge>
-                  </TableCell>
-                )}
-                {visibleColumns.createdAt && <TableCell>{format(new Date(user.createdAt), 'PPpp')}</TableCell>}
-              </TableRow>
-            );
-          })
-        ) : (
-          <TableRow>
-            <TableCell colSpan={Object.values(visibleColumns).filter(Boolean).length} className="h-24 text-center">
-              No users found.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
-  );
+    const next = users.filter((user) => {
+      const matchesSearch =
+        user.displayName.toLowerCase().includes(queryText) ||
+        user.email.toLowerCase().includes(queryText) ||
+        user.id.toLowerCase().includes(queryText);
 
-  if (loading) {
-    return <div className="container mx-auto p-4"><Skeleton className="h-96 w-full" /></div>;
-  }
+      if (!matchesSearch) {
+        return false;
+      }
 
-  if (!isAdmin) {
-    return (
-      <div className="container mx-auto p-4 text-center">
-        <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-        <p>You do not have permission to view this page.</p>
-      </div>
-    );
-  }
+      if (!newArrivalsOnly) {
+        return true;
+      }
+
+      if (!user.createdAt) {
+        return false;
+      }
+
+      return now - new Date(user.createdAt).getTime() <= SEVEN_DAYS_MS;
+    });
+
+    return next;
+  }, [newArrivalsOnly, searchQuery, users]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
+
+  const pagedUsers = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredUsers.slice(start, start + PAGE_SIZE);
+  }, [currentPage, filteredUsers]);
+
+  const newArrivalsCount = useMemo(() => {
+    const now = Date.now();
+    return users.filter((user) => user.createdAt && now - new Date(user.createdAt).getTime() <= SEVEN_DAYS_MS).length;
+  }, [users]);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    toast({ title: 'Signed out', description: 'Admin session closed.' });
+    router.push('/');
+  };
+
+  const exportCsvPlaceholder = () => {
+    toast({ title: 'Export placeholder', description: 'CSV export will be connected in a backend pass.' });
+  };
 
   return (
-    <div className="container mx-auto p-4">
-      <Card className={cn('shadow-xl bg-card/80 backdrop-blur-sm', isPremium && 'premium-video animate-premium-pulse')}>
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold flex items-center gap-2">
-            <ShieldAlert className="h-8 w-8 text-primary" aria-hidden="true" />
-            Admin Dashboard
-            {isPremium && <Gem className="h-6 w-6 text-primary" aria-hidden="true" />}
-          </CardTitle>
-          <CardDescription>Manage users, verification, and system status.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between items-center mb-4">
-            <Input
-              placeholder="Filter users by name, email, or UID..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="max-w-sm"
-              aria-label="Filter users"
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">Columns</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {Object.keys(visibleColumns).map((key) => (
-                  <DropdownMenuCheckboxItem
-                    key={key}
-                    className="capitalize"
-                    checked={visibleColumns[key]}
-                    onCheckedChange={(value) => setVisibleColumns(prev => ({ ...prev, [key]: !!value }))}
+    <div className="min-h-screen bg-[#070707] text-white">
+      <div className="flex min-h-screen">
+        <Sidebar activeKey="users" mobileOpen={mobileSidebarOpen} onCloseMobile={() => setMobileSidebarOpen(false)} />
+
+        <section className="flex min-h-screen flex-1 flex-col">
+          <TopBar onOpenMenu={() => setMobileSidebarOpen(true)} onSignOut={handleSignOut} />
+
+          <div className="space-y-5 p-4 sm:p-6">
+            <Card className="rounded-3xl border border-white/10 bg-[#111111]/80 backdrop-blur-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-2xl text-white">
+                  <Users className="h-5 w-5 text-[#FFD700]" />
+                  All Users
+                </CardTitle>
+                <CardDescription className="text-gray-300">
+                  Search all users, inspect recent arrivals, and review verification status.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <Input
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Search users by name, email, or Live ID..."
+                    className="min-h-12 border-white/15 bg-black/25 text-white placeholder:text-gray-400"
+                    aria-label="Search users"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setNewArrivalsOnly((value) => !value);
+                      setCurrentPage(1);
+                    }}
+                    className="min-h-12 border-white/20 bg-black/25 text-white hover:border-[#FFD700]/35 hover:bg-black/35"
                   >
-                    {key}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <UserPlus className="mr-2 h-4 w-4 text-[#FFD700]" />
+                    {newArrivalsOnly ? 'Show All Users' : 'New Arrivals (7d)'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={exportCsvPlaceholder}
+                    className="min-h-12 border-white/20 bg-black/25 text-white hover:border-[#FFD700]/35 hover:bg-black/35"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className="border border-[#FFD700]/30 bg-[#FFD700]/15 text-[#FFE7A0]">
+                    New Arrivals: {newArrivalsCount}
+                  </Badge>
+                  <Badge className="border border-white/20 bg-white/[0.06] text-white">
+                    Total Results: {filteredUsers.length}
+                  </Badge>
+                  <Badge className="border border-white/20 bg-white/[0.06] text-white">
+                    Page {currentPage} of {totalPages}
+                  </Badge>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10">
+                        <TableHead className="text-gray-300">User</TableHead>
+                        <TableHead className="text-gray-300">Email</TableHead>
+                        <TableHead className="text-gray-300">Package</TableHead>
+                        <TableHead className="text-gray-300">Verification</TableHead>
+                        <TableHead className="text-gray-300">Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-10 text-center text-gray-400">
+                            Loading users...
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {!loading && pagedUsers.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-10 text-center text-gray-400">
+                            No users found for the current filters.
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {!loading &&
+                        pagedUsers.map((user) => (
+                          <TableRow key={user.id} className="border-white/10">
+                            <TableCell className="text-white">
+                              <p className="font-semibold">{user.displayName}</p>
+                              <p className="text-xs text-gray-400">{user.id}</p>
+                            </TableCell>
+                            <TableCell className="text-gray-200">{user.email}</TableCell>
+                            <TableCell>
+                              <Badge className="border border-white/20 bg-white/[0.06] text-white capitalize">{user.package}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="border border-[#FFD700]/30 bg-[#FFD700]/15 text-[#FFE7A0] uppercase">
+                                {user.verificationLevel}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-gray-300">
+                              {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    className="min-h-12 border-white/20 bg-black/25 text-white"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    className="min-h-12 border-white/20 bg-black/25 text-white"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <Tabs defaultValue="all">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">
-                <Users className="mr-2 h-4 w-4" aria-hidden="true" /> All Users ({filteredUsers.all.length})
-              </TabsTrigger>
-              <TabsTrigger value="online">
-                <CircleDot className="mr-2 h-4 w-4" aria-hidden="true" /> Online Users ({filteredUsers.online.length})
-              </TabsTrigger>
-              <TabsTrigger value="pending">
-                <ShieldAlert className="mr-2 h-4 w-4" aria-hidden="true" /> Pending Verification ({filteredUsers.pending.length})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="all">{renderUserTable(filteredUsers.all)}</TabsContent>
-            <TabsContent value="online">{renderUserTable(filteredUsers.online)}</TabsContent>
-            <TabsContent value="pending">{renderUserTable(filteredUsers.pending)}</TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        </section>
+      </div>
     </div>
   );
 }

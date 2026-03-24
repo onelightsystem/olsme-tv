@@ -9,15 +9,14 @@
     "runtime": "nodejs22"
   },
   "hosting": {
-    "source": ".",
+    "public": "out",
+    "cleanUrls": true,
+    "trailingSlash": false,
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
-    ],
-    "frameworksBackend": {
-      "region": "us-central1"
-    }
+    ]
   },
   "emulators": {
     "functions": { "port": 5001 },

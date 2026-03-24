@@ -2,16 +2,27 @@
 
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle, Crown, Lock } from 'lucide-react';
+import { CheckCircle, Crown, Key, Lock } from 'lucide-react';
 import { Button } from '@components/ui/button';
 
 // TODO: move prices to Firebase Remote Config or .env for admin changes without redeploy
 // Current monthly: Starter $0.25, Premium $1. Monthly can change anytime.
 // Annual = one-time payment for 12 months (not recurring). Fixed "deal lock" against future monthly increases.
+// Entry Key = monthly recurring $0.10 onboarding tier.
+const ENTRY_KEY_PRICE = 0.10;
 const STARTER_MONTHLY_PRICE = 0.25;
 const PREMIUM_MONTHLY_PRICE = 1.00;
 const STARTER_ANNUAL_PRICE = 10;  // one-time deal lock – 12 months
 const PREMIUM_ANNUAL_PRICE = 30;  // one-time deal lock – 12 months
+
+const ENTRY_KEY_FEATURES = [
+  "Verified Global Live ID",
+  "Access to live hosts directory",
+  "Watch Host TV sessions (viewer only)",
+  "Basic AI politeness badge",
+  "Access to real humans",
+  "Establishes your presence on olsme.tv",
+];
 
 const STARTER_FEATURES = [
   "Olsme platform subscription",
@@ -33,7 +44,17 @@ const PREMIUM_FEATURES = [
 
 const TIERS = [
   {
+    id: 'entry-key',
+    billingMode: 'monthly-only',
+    isPremium: false,
+    label: 'Entry Key',
+    monthlyPrice: ENTRY_KEY_PRICE,
+    features: ENTRY_KEY_FEATURES,
+    monthlyCta: 'Start Entry Key – $0.10/month',
+  },
+  {
     id: 'starter',
+    billingMode: 'monthly-annual',
     isPremium: false,
     label: 'Starter Access',
     monthlyPrice: STARTER_MONTHLY_PRICE,
@@ -44,6 +65,7 @@ const TIERS = [
   },
   {
     id: 'premium',
+    billingMode: 'monthly-annual',
     isPremium: true,
     label: 'Premium Access',
     monthlyPrice: PREMIUM_MONTHLY_PRICE,
@@ -92,10 +114,11 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {TIERS.map((tier, index) => {
-          const price = isAnnual ? tier.annualPrice : tier.monthlyPrice;
-          const cta = isAnnual ? tier.annualCta : tier.monthlyCta;
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {TIERS.filter((tier) => !(isAnnual && tier.billingMode === 'monthly-only')).map((tier, index) => {
+          const isMonthlyOnly = tier.billingMode === 'monthly-only';
+          const price = isMonthlyOnly ? tier.monthlyPrice : (isAnnual ? tier.annualPrice : tier.monthlyPrice);
+          const cta = isMonthlyOnly ? tier.monthlyCta : (isAnnual ? tier.annualCta : tier.monthlyCta);
           return (
             <motion.div
               key={tier.id}
@@ -112,7 +135,7 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
             >
               {/* Annual deal-lock badge – animates in/out with switcher */}
               <AnimatePresence>
-                {isAnnual && (
+                {isAnnual && !isMonthlyOnly && (
                   <motion.span
                     initial={{ opacity: 0, scale: 0.85, y: -4 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -126,7 +149,9 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
               </AnimatePresence>
 
               <div className="flex items-center gap-2">
-                {tier.isPremium ? (
+                {isMonthlyOnly ? (
+                  <Key className="h-5 w-5 text-white/85" />
+                ) : tier.isPremium ? (
                   <Crown className="h-5 w-5 text-[#FFD700]" />
                 ) : (
                   <Lock className="h-5 w-5 text-white/85" />
@@ -147,13 +172,13 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
                   >
                     ${price.toFixed(2)}
                     <span className="text-sm font-normal text-white/75">
-                      &thinsp;{isAnnual ? '/ year' : '/ month'}
+                      &thinsp;{isMonthlyOnly ? '/ month' : (isAnnual ? '/ year' : '/ month')}
                     </span>
                   </motion.p>
                 </AnimatePresence>
-                {/* Fixed-price note fades in when annual is selected */}
+                {/* Fixed-price note fades in when annual is selected (not for Entry Key) */}
                 <AnimatePresence>
-                  {isAnnual && (
+                  {isAnnual && !isMonthlyOnly && (
                     <motion.p
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -178,11 +203,15 @@ export default function SubscriptionCards({ onSignUp, onUpgrade }: Props) {
 
               <motion.div
                 className="mt-auto"
-                whileHover={{ scale: isAnnual ? 1.04 : 1.01 }}
+                whileHover={{ scale: isMonthlyOnly ? 1.02 : (isAnnual ? 1.04 : 1.01) }}
                 transition={{ type: 'spring', stiffness: 300, damping: 18 }}
               >
                 <Button
-                  className="w-full min-h-[3rem] bg-gradient-to-r from-[#FFD700] to-[#FFAA00] font-semibold text-[#0F0F0F] hover:opacity-90 hover:shadow-[0_0_18px_rgba(255,215,0,0.38)]"
+                  className={`w-full min-h-[3rem] font-semibold ${
+                    isMonthlyOnly
+                      ? 'bg-gradient-to-r from-white/20 to-[#FFD700]/30 text-white hover:opacity-90 hover:shadow-[0_0_12px_rgba(255,215,0,0.2)]'
+                      : 'bg-gradient-to-r from-[#FFD700] to-[#FFAA00] text-[#0F0F0F] hover:opacity-90 hover:shadow-[0_0_18px_rgba(255,215,0,0.38)]'
+                  }`}
                   onClick={tier.isPremium ? onUpgrade : onSignUp}
                 >
                   {cta}

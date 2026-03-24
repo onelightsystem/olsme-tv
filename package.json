@@ -1,6 +1,6 @@
 {
   "name": "olsme-tv",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "private": true,
   "scripts": {
@@ -8,6 +8,7 @@
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
+    "export": "next build",
     "start": "next start -p 9002",
     "lint": "eslint src functions/src --fix",
     "typecheck": "tsc --noEmit && tsc --noEmit --project functions/tsconfig.json",
