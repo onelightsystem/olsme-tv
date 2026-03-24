@@ -890,6 +890,36 @@ export const paypalWebhook = onRequest({cors: allowedCorsOrigins}, async (req, r
   }
 });
 
+export const getNotifications = onCall({cors: callableCorsOrigins}, async (request: CallableRequest<unknown>) => {
+  const auth = request.auth;
+  if (!auth?.token.isAdmin) {
+    throw new HttpsError("permission-denied", "Must be an admin to access notification data.");
+  }
+  try {
+    const snapshot = await db.collection("notifications")
+      .orderBy("createdAt", "desc")
+      .limit(250)
+      .get();
+    const notifications = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString()
+        : data.timestamp?.toDate ? data.timestamp.toDate().toISOString()
+        : null;
+      return {
+        id: docSnap.id,
+        title: typeof data.title === "string" ? data.title : "Untitled notification",
+        message: typeof data.message === "string" ? data.message : "",
+        targetUsers: typeof data.targetUsers === "string" ? data.targetUsers : "All Users",
+        createdAt,
+      };
+    });
+    return {notifications};
+  } catch (error) {
+    functions.logger.error("Error fetching notifications:", error);
+    throw new HttpsError("internal", "Failed to fetch notifications.");
+  }
+});
+
 async function generateDecentralizedId(uid: string): Promise<string> {
   // TODO: Integrate Polygon/IPFS for decentralized user IDs
   return `ipfs://${uid}`;
