@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
-import { collection, limit, onSnapshot, query } from 'firebase/firestore';
-import { Download, ShieldCheck } from 'lucide-react';
-import { auth, db } from '@lib/firebase/config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { Download, RefreshCw, ShieldCheck } from 'lucide-react';
+import { auth } from '@lib/firebase/config';
 import Sidebar from '@components/admin/Sidebar';
 import TopBar from '@components/admin/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@components/ui/card';
@@ -27,21 +27,6 @@ type VerificationRow = {
 const PAGE_SIZE = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    const toDate = (value as { toDate?: () => Date }).toDate;
-    if (typeof toDate === 'function') {
-      return toDate();
-    }
-  }
-  return null;
-}
-
 export default function AdminVerificationsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -54,54 +39,57 @@ export default function AdminVerificationsPage() {
   const [rows, setRows] = useState<VerificationRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const usersQuery = query(collection(db, 'users'), limit(250));
-    const unsubscribe = onSnapshot(
-      usersQuery,
-      (snapshot) => {
-        const nextRows = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Record<string, unknown>;
-          const level = (typeof data.verificationLevel === 'string' ? data.verificationLevel : 'level1') as
-            | 'level1'
-            | 'level2'
-            | 'level3';
-          const pendingLevel =
-            data.pendingVerificationLevel === 'level2' || data.pendingVerificationLevel === 'level3'
-              ? (data.pendingVerificationLevel as 'level2' | 'level3')
-              : level === 'level1'
-                ? 'level2'
-                : level === 'level2'
-                  ? 'level3'
-                  : null;
-          const created = parseDate(data.createdAt ?? data.timestamp);
-
-          return {
-            id: docSnap.id,
-            displayName: typeof data.displayName === 'string' ? data.displayName : 'Unknown user',
-            email: typeof data.email === 'string' ? data.email : 'No email',
-            verificationLevel: level,
-            pendingLevel,
-            createdAt: created ? created.toISOString() : null,
-          } as VerificationRow;
-        });
-
-        nextRows.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
-        });
-
-        setRows(nextRows);
-        setLoading(false);
-      },
-      () => {
-        setRows([]);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+  const fetchVerificationQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const functions = getFunctions();
+      const getVerificationQueue = httpsCallable<unknown, { users: Array<{
+        id: string;
+        displayName: string;
+        email: string;
+        verificationLevel: string;
+        pendingVerificationLevel: string | null;
+        createdAt: string | null;
+      }> }>(functions, 'getVerificationQueue');
+      const result = await getVerificationQueue({});
+      const nextRows: VerificationRow[] = result.data.users.map((user) => {
+        const level = (user.verificationLevel === 'level1' || user.verificationLevel === 'level2' || user.verificationLevel === 'level3'
+          ? user.verificationLevel
+          : 'level1') as 'level1' | 'level2' | 'level3';
+        const pendingLevel =
+          user.pendingVerificationLevel === 'level2' || user.pendingVerificationLevel === 'level3'
+            ? (user.pendingVerificationLevel as 'level2' | 'level3')
+            : level === 'level1'
+              ? 'level2'
+              : level === 'level2'
+                ? 'level3'
+                : null;
+        return {
+          id: user.id,
+          displayName: user.displayName,
+          email: user.email,
+          verificationLevel: level,
+          pendingLevel,
+          createdAt: user.createdAt,
+        };
+      });
+      nextRows.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+      setRows(nextRows);
+    } catch {
+      setRows([]);
+      toast({ title: 'Failed to load', description: 'Could not fetch the verification queue. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchVerificationQueue();
+  }, [fetchVerificationQueue]);
 
   const filteredRows = useMemo(() => {
     const now = Date.now();
@@ -186,7 +174,7 @@ export default function AdminVerificationsPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]">
                   <Input
                     value={searchQuery}
                     onChange={(event) => {
@@ -233,6 +221,17 @@ export default function AdminVerificationsPage() {
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Export CSV
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => { void fetchVerificationQueue(); }}
+                    className="min-h-12 border-white/20 bg-black/25 text-white"
+                    disabled={loading}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
                   </Button>
                 </div>
 
