@@ -147,15 +147,22 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
         });
 
         if (!verifyResponse.ok) {
-          window.cfturnstile?.reset();
-          setTurnstileToken('');
-          toast({
-            variant: 'destructive',
-            title: 'Verification Failed',
-            description: 'Bot verification failed – try again',
-          });
-          setErrorMessage('Bot verification failed – try again');
-          return;
+          // If the endpoint explicitly signals it is disabled (static export stub),
+          // skip Turnstile verification and allow signup to proceed.
+          let responseBody: { disabled?: boolean } = {};
+          try { responseBody = await verifyResponse.json(); } catch { /* ignore */ }
+          if (!responseBody.disabled) {
+            window.cfturnstile?.reset();
+            setTurnstileToken('');
+            toast({
+              variant: 'destructive',
+              title: 'Verification Failed',
+              description: 'Bot verification failed – try again',
+            });
+            setErrorMessage('Bot verification failed – try again');
+            return;
+          }
+          // responseBody.disabled === true → endpoint is intentionally unavailable; proceed.
         }
       }
 
