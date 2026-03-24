@@ -540,6 +540,7 @@ export const getAllUsers = onCall({cors: callableCorsOrigins}, async (request: C
       const userData = document.data();
       const createdAt = userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null;
       return {
+        id: document.id,
         ...userData,
         createdAt,
         status: onlineUsers.has(document.id) ? "online" : "offline"

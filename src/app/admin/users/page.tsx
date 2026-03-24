@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
-import { collection, limit, onSnapshot, query } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Download, Users, UserPlus } from 'lucide-react';
-import { auth, db } from '@lib/firebase/config';
+import { auth } from '@lib/firebase/config';
 import Sidebar from '@components/admin/Sidebar';
 import TopBar from '@components/admin/TopBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@components/ui/card';
@@ -27,20 +27,7 @@ type AdminUser = {
 const PAGE_SIZE = 10;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    const toDate = (value as { toDate?: () => Date }).toDate;
-    if (typeof toDate === 'function') {
-      return toDate();
-    }
-  }
-  return null;
-}
+type GetAllUsersResult = { users: Array<Record<string, unknown>> };
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -54,20 +41,19 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const usersQuery = query(collection(db, 'users'), limit(250));
-    const unsubscribe = onSnapshot(
-      usersQuery,
-      (snapshot) => {
-        const mapped = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as Record<string, unknown>;
-          const created = parseDate(data.createdAt ?? data.startDate ?? data.timestamp);
+    const functions = getFunctions();
+    const getAllUsers = httpsCallable<unknown, GetAllUsersResult>(functions, 'getAllUsers');
+
+    getAllUsers()
+      .then((result) => {
+        const mapped = result.data.users.map((userData) => {
           return {
-            id: docSnap.id,
-            displayName: typeof data.displayName === 'string' ? data.displayName : 'Unknown user',
-            email: typeof data.email === 'string' ? data.email : 'No email',
-            package: typeof data.package === 'string' ? data.package : 'free',
-            verificationLevel: typeof data.verificationLevel === 'string' ? data.verificationLevel : 'level1',
-            createdAt: created ? created.toISOString() : null,
+            id: typeof userData.id === 'string' ? userData.id : '',
+            displayName: typeof userData.displayName === 'string' ? userData.displayName : 'Unknown user',
+            email: typeof userData.email === 'string' ? userData.email : 'No email',
+            package: typeof userData.package === 'string' ? userData.package : 'free',
+            verificationLevel: typeof userData.verificationLevel === 'string' ? userData.verificationLevel : 'level1',
+            createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : null,
           } as AdminUser;
         });
 
@@ -79,14 +65,11 @@ export default function AdminUsersPage() {
 
         setUsers(mapped);
         setLoading(false);
-      },
-      () => {
+      })
+      .catch(() => {
         setUsers([]);
         setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+      });
   }, []);
 
   const filteredUsers = useMemo(() => {
