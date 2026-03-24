@@ -462,8 +462,8 @@ export default function SubscribePage() {
                               }) as {data: {orderID: string}};
                               return result.data.orderID;
                             }}
-                            onApprove={async (data) => {
-                              // Capture server-side: verifies payment, sets premium claim, updates Firestore
+                            onApprove={async (data, _actions) => {
+                              // Capture is handled server-side by capturePaypalOrder callable
                               await handleApprove(tier, data.orderID);
                             }}
                           />
