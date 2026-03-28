@@ -1,7 +1,13 @@
 # Restore SSR Mode – olsme.tv (after Firebase Hosting bug fix)
 
-**Last updated:** March 23, 2026  
-**Status:** Static export mode is ACTIVE. SSR is currently disabled.
+**Last updated:** March 28, 2026  
+**Status:** SSR MODE RESTORED (v0.4.2). Static export mode has been removed.
+
+> **Completed March 28, 2026:** SSR was successfully restored using firebase-tools v15.12.0.
+> An additional fix was required: `next.config.ts` was renamed to `next.config.mjs` to avoid
+> a CJS/ESM conflict on Cloud Run (the `"type": "module"` in package.json caused the
+> transpiled `.js` config to fail with `ReferenceError: module is not defined in ES module scope`).
+> The `.mjs` extension forces ESM natively, bypassing firebase-frameworks' TS transpilation.
 
 ---
 

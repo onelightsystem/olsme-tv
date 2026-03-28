@@ -939,7 +939,7 @@ export const getNotifications = onCall({cors: callableCorsOrigins}, async (reque
       const data = docSnap.data();
       const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString()
         : data.timestamp?.toDate ? data.timestamp.toDate().toISOString()
-        : null;
+          : null;
       return {
         id: docSnap.id,
         title: typeof data.title === "string" ? data.title : "Untitled notification",

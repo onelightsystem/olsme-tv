@@ -1,14 +1,14 @@
 # olsme.tv Blueprint
 
-Version: v0.4.1 (March 2026)
-Hosting: https://olsme.tv (Firebase Hosting)
+Version: v0.4.2 (March 2026)
+Hosting: https://olsme.tv (Firebase Hosting + Cloud Run SSR)
 Fallback Firebase URL: https://studio-4615914296-4bd91.web.app
 
-> **Hosting mode (March 23, 2026):** Static export (`output: 'export'`, `firebase.json public: "out"`).
-> SSR via Cloud Run is temporarily disabled due to Firebase Hosting 409 revision-conflict bug
-> (firebase-tools #10148 / #10155). To restore SSR when the bug is fixed, follow [docs/RESTORE_SSR.md](RESTORE_SSR.md).
+> **Hosting mode (March 28, 2026):** Full SSR via Cloud Run (`frameworksBackend: us-central1`).
+> The 409 revision-conflict bug (firebase-tools #10148 / #10155) is resolved in firebase-tools v15.12.0.
+> Static export mode has been removed. See [docs/RESTORE_SSR.md](RESTORE_SSR.md) for rollback instructions if needed.
 
-Description: olsme.tv is a mindful random video chat platform under the OLS vision, focused on anti-toxicity, conscious communication, and digital awakening. The current platform is built on Next.js 16 App Router, React 19, TypeScript, Tailwind CSS, Firebase Auth, Firestore, Cloud Functions, and Hosting, with WebRTC and AI politeness systems in active development. v0.4.1 introduces a three-tier freemium model, custom-claim premium gating, Turnstile bot protection, and PayPal live payment groundwork in a dark-glass interface with golden sun accents.
+Description: olsme.tv is a mindful random video chat platform under the OLS vision, focused on anti-toxicity, conscious communication, and digital awakening. The current platform is built on Next.js 16 App Router, React 19, TypeScript, Tailwind CSS, Firebase Auth, Firestore, Cloud Functions, and Hosting (Cloud Run SSR), with WebRTC and AI politeness systems in active development. v0.4.2 restores full SSR mode after the Cloud Run 409 revision-conflict bug was resolved in firebase-tools v15.12.0. All API routes (IPFS, Turnstile verification) and PayPal callables are now fully server-side. The three-tier freemium model, custom-claim premium gating, and dark-glass golden UI from v0.4.1 remain intact.
 
 ## Current Pricing Tiers
 
@@ -68,7 +68,14 @@ Analysis: The active design language is dark-glass morphism with warm gold highl
 
 ## Final Reflection (March 2026)
 
-v0.4.1 marks a practical maturity step: secure premium gating is in place, tiered pricing is aligned with low-friction onboarding, and PayPal live integration has moved from concept to operational implementation phase. The product now communicates a clearer identity through dark-glass golden UI and focused user journeys, while preserving the original OLS intention of conscious, respectful connection.
+v0.4.2 restores full SSR mode after five days in static export. The Cloud Run 409 revision-conflict bug (firebase-tools #10148 / #10155) is resolved in firebase-tools v15.12.0, released March 27, 2026. All API routes, PayPal callables, and WebRTC signaling infrastructure are now fully server-side again. The temporary static stubs and `output: 'export'` workaround have been cleanly removed.
+
+What changed in v0.4.2:
+- firebase-tools updated to v15.12.0 (409 bug fix confirmed).
+- `next.config.ts`: removed `output: 'export'`.
+- `firebase.json`: restored `frameworksBackend` block (us-central1), removed static `public: "out"`.
+- API routes (`/api/ipfs`, `/api/ipfs-upload`, `/api/verify-turnstile`): original POST handlers restored, static GET stubs removed.
+- `package.json`: removed `"export"` script, version bumped to 0.4.2.
 
 Next steps:
 - Complete PayPal end-to-end hardening and webhook verification coverage.

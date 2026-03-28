@@ -92,10 +92,12 @@ export default function AboutPage() {
                 Current Phase
               </h2>
               <p className="mt-3 text-gray-300">
-                Version <span className="font-semibold text-[#FFD700]">v0.4.1 (March 2026)</span> is live with our three-tier model: <span className="font-semibold text-[#FFD700]">Entry Key</span>
+                Version <span className="font-semibold text-[#FFD700]">v0.4.2 (March 2026)</span> is live with our three-tier model: <span className="font-semibold text-[#FFD700]">Entry Key</span>
                 {' '}($0.10/month), <span className="font-semibold text-[#FFD700]">Starter</span> ($0.25/month or $10/year lock), and{' '}
-                <span className="font-semibold text-[#FFD700]">Premium</span> ($1/month or $30/year lock). Early adopters can lock annual deals on a
-                first-come, first-served basis, and historical prices stay with each account.
+                <span className="font-semibold text-[#FFD700]">Premium</span> ($1/month or $30/year lock).
+                {' '}All tiers are currently in <span className="font-bold text-red-500">Beta Mode</span>.
+                {' '}Lock your price now — these are early-stage rates and will increase as the platform grows.
+                {' '}Early adopters keep their locked price forever, even after future adjustments.
               </p>
             </article>
           </div>

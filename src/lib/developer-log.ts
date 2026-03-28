@@ -7,6 +7,19 @@ export type LogEntry = {
 
 export const developerLogEntries: LogEntry[] = [
   {
+    date: new Date('2026-03-28'),
+    title: 'v0.4.2 - Full SSR Restored – Cloud Run 409 Bug Resolved',
+    description:
+      'Version 0.4.2 restores full Server-Side Rendering via Firebase Hosting + Cloud Run.\n\n' +
+      'The Cloud Run 409 revision-conflict bug (firebase-tools #10148 / #10155) is resolved in firebase-tools v15.12.0. ' +
+      'All changes from the temporary static export workaround have been cleanly reverted:\n' +
+      '- next.config.ts: removed output: \'export\'\n' +
+      '- firebase.json: restored frameworksBackend block (us-central1)\n' +
+      '- API routes (/api/ipfs, /api/ipfs-upload, /api/verify-turnstile): original POST handlers restored\n' +
+      '- PayPal callables and WebRTC signaling are now fully server-side again\n\n' +
+      'SSR benefits restored: faster first paint, dynamic server rendering for /profile, /subscribe, and all API routes.',
+  },
+  {
     date: new Date('2026-03-22'),
     title: 'v0.4.1 - Subscription Cards & Lockable Deals Live',
     description:

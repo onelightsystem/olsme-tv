@@ -1,4 +1,4 @@
-// Path: next.config.ts
+// Path: next.config.mjs
 // Improvements (Oct 2, 2025):
 // - Added mocks for `node:fs` and `node:net` to resolve `ipfs-http-client` errors.
 // - Removed invalid `srcDir` option (Next.js 15.5.3 compatibility).
@@ -6,9 +6,6 @@
 // - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // TEMPORARY: static export mode while SSR Cloud Run deploy is blocked (409 bug).
-  // To revert to SSR: remove this line and restore firebase.json frameworksBackend block.
-  output: 'export',
   turbopack: {},
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)
@@ -31,7 +28,7 @@ const nextConfig = {
     FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
     NEXT_PUBLIC_IPFS_URL: process.env.NEXT_PUBLIC_IPFS_URL || 'https://ipfs.infura.io:5001',
   },
-  webpack: (config: { resolve?: { fallback?: Record<string, boolean> } }) => {
+  webpack: (config) => {
     config.resolve = config.resolve ?? {};
     config.resolve.fallback = {
       ...config.resolve.fallback,
