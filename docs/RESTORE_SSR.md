@@ -1,7 +1,13 @@
 # Restore SSR Mode – olsme.tv (after Firebase Hosting bug fix)
 
-**Last updated:** March 23, 2026  
-**Status:** Static export mode is ACTIVE. SSR is currently disabled.
+**Last updated:** March 28, 2026  
+**Status:** SSR MODE RESTORED (v0.4.2). Static export mode has been removed.
+
+> **Completed March 28, 2026:** SSR was successfully restored using firebase-tools v15.12.0.
+> An additional fix was required: `next.config.ts` was renamed to `next.config.mjs` to avoid
+> a CJS/ESM conflict on Cloud Run (the `"type": "module"` in package.json caused the
+> transpiled `.js` config to fail with `ReferenceError: module is not defined in ES module scope`).
+> The `.mjs` extension forces ESM natively, bypassing firebase-frameworks' TS transpilation.
 
 ---
 
@@ -42,7 +48,7 @@ Before starting:
 
 ## Step-by-Step Revert Instructions
 
-### Step 1 — Remove `output: 'export'` from `next.config.ts`
+### Step 1 — Remove `output: 'export'` from `next.config.mjs`
 
 **Current (static mode):**
 ```ts
@@ -238,7 +244,7 @@ After deploy, confirm the following:
 If the 409 bug reappears after updating firebase-tools, revert to static mode immediately:
 
 ```bash
-# 1. Restore static config in next.config.ts and firebase.json (re-apply Step 1/2 in reverse)
+# 1. Restore static config in next.config.mjs and firebase.json (re-apply Step 1/2 in reverse)
 # 2. Rebuild and re-export
 npm run build
 # 3. Re-deploy static

@@ -215,8 +215,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     if (isAdminRoute) return;
     if (!pathname) return;
 
-    const userRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userRef, (snap) => {
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (snap) => {
       const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
       const hasPremiumAccess =
         data?.isPremium === true ||
