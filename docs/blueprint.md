@@ -72,7 +72,7 @@ v0.4.2 restores full SSR mode after five days in static export. The Cloud Run 40
 
 What changed in v0.4.2:
 - firebase-tools updated to v15.12.0 (409 bug fix confirmed).
-- `next.config.ts`: removed `output: 'export'`.
+- `next.config.mjs`: removed `output: 'export'`.
 - `firebase.json`: restored `frameworksBackend` block (us-central1), removed static `public: "out"`.
 - API routes (`/api/ipfs`, `/api/ipfs-upload`, `/api/verify-turnstile`): original POST handlers restored, static GET stubs removed.
 - `package.json`: removed `"export"` script, version bumped to 0.4.2.
