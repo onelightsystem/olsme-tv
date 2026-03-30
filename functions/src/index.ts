@@ -937,9 +937,14 @@ export const getNotifications = onCall({cors: callableCorsOrigins}, async (reque
       .get();
     const notifications = snapshot.docs.map((docSnap) => {
       const data = docSnap.data();
-      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString()
-        : data.timestamp?.toDate ? data.timestamp.toDate().toISOString()
-          : null;
+      let createdAt: string | null;
+      if (data.createdAt?.toDate) {
+        createdAt = data.createdAt.toDate().toISOString();
+      } else if (data.timestamp?.toDate) {
+        createdAt = data.timestamp.toDate().toISOString();
+      } else {
+        createdAt = null;
+      }
       return {
         id: docSnap.id,
         title: typeof data.title === "string" ? data.title : "Untitled notification",
