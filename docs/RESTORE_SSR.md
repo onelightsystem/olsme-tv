@@ -48,7 +48,7 @@ Before starting:
 
 ## Step-by-Step Revert Instructions
 
-### Step 1 — Remove `output: 'export'` from `next.config.ts`
+### Step 1 — Remove `output: 'export'` from `next.config.mjs`
 
 **Current (static mode):**
 ```ts
@@ -244,7 +244,7 @@ After deploy, confirm the following:
 If the 409 bug reappears after updating firebase-tools, revert to static mode immediately:
 
 ```bash
-# 1. Restore static config in next.config.ts and firebase.json (re-apply Step 1/2 in reverse)
+# 1. Restore static config in next.config.mjs and firebase.json (re-apply Step 1/2 in reverse)
 # 2. Rebuild and re-export
 npm run build
 # 3. Re-deploy static
