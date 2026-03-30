@@ -5,8 +5,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{document=**} {
-      allow read, write: if request.auth != null;
+
+    match /users/{userId} {
+      // Server-managed subscription/premium fields that clients must not set or modify.
+      // These are written exclusively by Cloud Functions (updateSubscriptionStatus, etc.).
+      function serverManagedFields() {
+        return ['isPremium', 'subscriptionTier', 'subscriptionStatus',
+                'package', 'startDate', 'paypalOrderId'];
+      }
+
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Allow creating own document (e.g. during signup) but not with subscription fields.
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(serverManagedFields());
+
+      // Allow updating own document but prevent changing any subscription/premium field.
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasNone(serverManagedFields());
+    }
+    match /subscriptions/{uid} {
+      // Only the authenticated owner can read their own subscription document.
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // Only server/admin (identified via custom claim) can modify subscription documents.
+      allow write: if request.auth != null && request.auth.token.isAdmin == true;
+    }
+    match /users/{userId}/{subcollection=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     match /prompts/{document=**} {
       allow read, write: if request.auth != null;
@@ -47,6 +75,9 @@ service cloud.firestore {
     }
     match /messages/{document=**} {
       allow read, write: if request.auth != null;
+    }
+    match /referrals/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.isAdmin == true;
     }
   }
 }

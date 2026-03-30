@@ -45,6 +45,14 @@ Optional:
 
 Without auth on an Infura URL, IPFS uploads are skipped and the app falls back to Firestore logs.
 
+### Environment (Turnstile)
+
+Cloudflare Turnstile bot verification requires a public site key. Set the following in `.env.local`:
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — your Cloudflare Turnstile site key (get one at https://dash.cloudflare.com/turnstile)
+
+When this variable is not set the Turnstile widget is hidden and the entire bot-verification flow (including the `/api/verify-turnstile` call) is skipped — signup proceeds directly. **Always set this variable in production.**
+
 ## Testing
 - Run `npm run dev`, visit `http://localhost:9002`.
 - Test login via Profile/Phone in `Header`, verify Firestore `users`.

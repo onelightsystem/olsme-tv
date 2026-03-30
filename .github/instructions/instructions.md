@@ -16,6 +16,18 @@ applyTo: '**/*.{ts,tsx,js,jsx,json,md}'
 - Use modular Firestore APIs (`doc(collection(...))`, `addDoc`, `writeBatch`) and avoid legacy chained APIs.
 - Preserve existing user-facing behavior unless explicitly asked to change UX.
 - Avoid introducing `any`; prefer narrow interfaces, unions, or `unknown` with safe narrowing.
+- Do not create additional documentation files unless explicitly requested; prefer updating existing docs in place.
+
+## Documentation Accuracy
+
+- For Markdown updates (`docs/*.md`, `README.md`, security/blueprint docs), verify claims against current code before writing.
+- Do not mark features as done unless implementation is present in the repository.
+- Distinguish clearly between:
+	- implemented,
+	- partially implemented/stubbed,
+	- planned.
+- For security docs, validate both code paths and rule/config coverage (for example claims checks, Firestore rules, callable auth checks).
+- For project tree docs, regenerate from the current workspace instead of manually editing stale paths.
 
 ## Reliability & Safety
 
@@ -24,7 +36,22 @@ applyTo: '**/*.{ts,tsx,js,jsx,json,md}'
 	- `npm run check:lint`
 	- `npm run check:types`
 	- `npm run check:security`
+	- `npm run build` (when changing routing, layout, or server-rendered page logic)
 - If a command fails due unrelated pre-existing issues, do not rewrite unrelated modules; document scope clearly.
+- When requested by the user, provide unified diffs (`git --no-pager diff -- <path>`) for changed files.
+
+## Known Non-Blocking Dev Warnings
+
+- Treat these as informational unless they correlate with user-facing regressions:
+	- React DevTools suggestion in local dev.
+	- Google Analytics cookie overwrite messages.
+	- Firestore streaming `NS_BINDING_ABORTED` during navigation/unload.
+	- Font preload "not used within a few seconds" in hot-reload sessions.
+- Prioritize actionable failures:
+	- TypeScript compile errors,
+	- Next.js build/prerender errors,
+	- runtime exceptions in app/function code,
+	- moderate/high/critical security findings.
 
 ## Dependency and Security Work
 
@@ -43,3 +70,4 @@ applyTo: '**/*.{ts,tsx,js,jsx,json,md}'
 	- how it was validated,
 	- any remaining risk/open items.
 - Reference concrete file paths for changed logic.
+- Keep final responses concise for straightforward doc updates, and include manual verification steps when requested.

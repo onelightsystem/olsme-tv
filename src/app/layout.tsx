@@ -8,18 +8,20 @@
 // - Solo Tip: Test with `npm run dev`, check font rendering, log auth state in Firestore/IPFS.
 'use client';
 import type { Metadata } from 'next';
+import { usePathname, useRouter } from 'next/navigation';
 import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@lib/utils';
 import { Toaster } from '@components/ui/toaster';
-import Header from '@components/layout/header';
+import Header from '@components/Header';
 import { auth, db } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useToast } from '@hooks/use-toast';
 import { metadata } from './metadata';
-import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { debounce } from 'lodash';
@@ -46,17 +48,29 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const userRef = useRef<FirebaseUser | null>(auth.currentUser);
+  const [authResolved, setAuthResolved] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const isAdminRoute = (pathname ?? '').startsWith('/admin');
 
   useEffect(() => {
+    // In local/dev environments this callable is often unavailable or CORS-restricted.
+    // Keep status syncing opt-in to avoid noisy console/network errors during UI work.
+    const isLocalHost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const statusSyncEnabled = !isLocalHost && (
+      process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_ENABLE_STATUS_SYNC === 'true'
+    );
     const functions = getFunctions();
     const updateUserStatus = httpsCallable(functions, 'updateUserStatus');
-    let statusUpdatesDisabled = false;
+    let statusUpdatesDisabled = !statusSyncEnabled;
     let warnedStatusDisabled = false;
     // Debounce status updates to reduce Cloud Function calls
     const debouncedUpdateStatus = debounce(async (status: string) => {
-      if (auth.currentUser && !statusUpdatesDisabled) {
+      if (auth.currentUser && statusSyncEnabled && !statusUpdatesDisabled) {
         try {
           await updateUserStatus({ status });
         } catch (e) {
@@ -64,7 +78,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           const shouldDisable =
             message.includes('404') ||
             message.toLowerCase().includes('cors') ||
-            message.toLowerCase().includes('not-found');
+            message.toLowerCase().includes('not-found') ||
+            message.toLowerCase().includes('access-control-allow-origin') ||
+            message.toLowerCase().includes('permission-denied') ||
+            message.toLowerCase().includes('internal');
           if (shouldDisable) {
             statusUpdatesDisabled = true;
             if (!warnedStatusDisabled) {
@@ -90,15 +107,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
       try {
         if (u) {
-          await u.getIdToken(true); // Force refresh token for custom claims
+          const {claims} = await u.getIdTokenResult(true); // Force refresh token for custom claims
           debouncedUpdateStatus('online');
-          const userDoc = await getDoc(doc(db, 'users', u.uid));
-          setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        } else if (user) {
+          setIsPremium(claims.isPremium === true || claims.subscriptionTier === 'tier2');
+        } else if (userRef.current && !u) {
           debouncedUpdateStatus('offline');
           setIsPremium(false);
         }
         setUser(u);
+        userRef.current = u;
 
         // Log auth state to Firestore
         const batch = writeBatch(db); // Fresh batch
@@ -138,6 +155,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         if (u) {
           await triggerBiofeedback(u.uid, 'chat', 'https://olsme.com/assets/red-sea-waves.mp3');
         }
+      } finally {
+        setAuthResolved(true);
       }
     });
 
@@ -149,13 +168,78 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       window.removeEventListener('beforeunload', handleBeforeUnload);
       debouncedUpdateStatus.cancel();
     };
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    if (!isAdminRoute) return;
+    if (!authResolved) return;
+
+    let isActive = true;
+
+    const enforceAdminClaim = async () => {
+      if (!user) {
+        if (isActive) {
+          console.warn('[admin-guard] unauthenticated visitor on admin route');
+          router.replace('/signin');
+        }
+        return;
+      }
+
+      try {
+        const token = await user.getIdTokenResult(true);
+        if (!isActive) return;
+
+        if (token.claims.isAdmin !== true) {
+          console.warn('[admin-guard] non-admin user blocked from admin route', { uid: user.uid });
+          toast({ variant: 'destructive', title: 'Admin access only' });
+          router.replace('/');
+        }
+      } catch (error) {
+        console.error('[admin-guard] claim read failed', error);
+        if (isActive) {
+          toast({ variant: 'destructive', title: 'Admin access only' });
+          router.replace('/');
+        }
+      }
+    };
+
+    enforceAdminClaim();
+
+    return () => {
+      isActive = false;
+    };
+  }, [authResolved, isAdminRoute, router, toast, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (isAdminRoute) return;
+    if (!pathname) return;
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (snap) => {
+      const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
+      const hasPremiumAccess =
+        data?.isPremium === true ||
+        data?.subscriptionTier === 'tier2' ||
+        data?.subscriptionStatus === 'active';
+
+      setIsPremium(hasPremiumAccess);
+
+      const nonPremiumAllowedPaths = new Set(['/subscribe', '/profile', '/about']);
+      if (!hasPremiumAccess && !nonPremiumAllowedPaths.has(pathname)) {
+        router.push('/subscribe');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAdminRoute, pathname, router, user]);
 
   return (
     <html lang="en" className={ptSans.className} suppressHydrationWarning>
       <head>
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description?.toString() ?? ''} />
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
       </head>
       <body
         className={cn(
@@ -165,8 +249,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         role="application"
       >
         <div className="relative flex min-h-screen flex-col">
-          <Header />
-          <main className="flex-1" role="main">
+          {!isAdminRoute && <Header />}
+          <main className={cn('flex-1', !isAdminRoute && 'pt-16')} role="main">
             {children}
           </main>
         </div>

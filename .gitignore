@@ -16,6 +16,11 @@
 # next.js
 /.next/
 /out/
+# stale build/cache artifacts left by firebase-tools --debug deploys
+.next_stale_build*/
+.next_cache_*/
+# pglite debug (local only)
+pglite-debug.log
 
 # production
 /build
@@ -41,5 +46,6 @@ next-env.d.ts
 .env*
 
 # firebase
+.firebase/
 firebase-debug.log
 firestore-debug.log

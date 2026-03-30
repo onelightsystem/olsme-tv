@@ -33,7 +33,12 @@ Keywords: debug, fix error, typecheck fail, tsconfig, firebase error, audit, vul
 
 4. Validate
 - Re-run targeted checks, then full checks.
+- Include `npm run build` for Next.js routing/layout/server-component changes, even if typecheck passes.
 - Report what was validated and what remains (if anything).
+
+5. Keep Documentation in Sync (when touched)
+- If the task includes security/blueprint/status docs, verify each "done" statement against code and config.
+- Avoid documenting route gates as complete unless the route exists and enforcement is implemented.
 
 ## Repository-Specific Tips
 
@@ -45,7 +50,18 @@ Keywords: debug, fix error, typecheck fail, tsconfig, firebase error, audit, vul
 
 - `npm run check:types`
 - `npm run check:lint`
-- `npm audit --audit-level=high`
+- `npm run check:security`
+- `npm audit --audit-level=moderate`
+- `npm run build`
+
+## Known Non-Blocking Signals
+
+- In local dev, treat these as low-priority unless they map to a functional regression:
+	- React DevTools suggestion banner.
+	- GA cookie overwrite logs.
+	- Firestore `NS_BINDING_ABORTED` on channel requests.
+	- preload-not-used font warnings during HMR.
+	- CSS parser warnings like dropped `-webkit-text-size-adjust` or `opacity` values during hot reload.
 
 ## Output Expectations
 

@@ -12,6 +12,7 @@ interface IPFSLogData {
 }
 
 let warnedMissingInfuraAuth = false;
+let ipfsUploadDisabled = false;
 
 async function safeAddLog(entry: Record<string, unknown>) {
   try {
@@ -42,6 +43,11 @@ export async function logToIPFS(data: IPFSLogData) {
     console.warn('IPFS logging skipped during SSR');
     return null;
   }
+
+  if (ipfsUploadDisabled) {
+    return null;
+  }
+
   const correlationId = data.correlationId || uuidv4();
   const startTime = performance.now();
   try {
@@ -61,7 +67,31 @@ export async function logToIPFS(data: IPFSLogData) {
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({...data, correlationId})
         });
+
+        if (response.ok) {
+          const json = await response.json() as {cid?: string; disabled?: boolean};
+          if (json.disabled) {
+            ipfsUploadDisabled = true;
+            if (!warnedMissingInfuraAuth) {
+              warnedMissingInfuraAuth = true;
+              console.warn('IPFS logging disabled: server-side IPFS credentials not configured. Set IPFS_AUTH_HEADER or IPFS_INFURA_PROJECT_ID/IPFS_INFURA_PROJECT_SECRET.');
+            }
+            await safeAddLog({
+              userId,
+              action,
+              context: 'ipfs_skipped_no_auth',
+              correlationId,
+              timestamp: new Date().toISOString()
+            });
+            return null;
+          }
+
+          cid = json.cid ?? null;
+          break;
+        }
+
         if (response.status === 503) {
+          ipfsUploadDisabled = true;
           if (!warnedMissingInfuraAuth) {
             warnedMissingInfuraAuth = true;
             console.warn('IPFS logging disabled: server-side IPFS credentials not configured. Set IPFS_AUTH_HEADER or IPFS_INFURA_PROJECT_ID/IPFS_INFURA_PROJECT_SECRET.');
@@ -90,10 +120,8 @@ export async function logToIPFS(data: IPFSLogData) {
         if (!response.ok) {
           throw new Error(`IPFS API responded with status ${response.status}`);
         }
-        const json = await response.json() as {cid?: string};
-        cid = json.cid ?? null;
-        break;
       } catch (err: unknown) {
+        const errMessage = err instanceof Error ? err.message : String(err);
         attempts++;
         if (attempts === maxAttempts) {
           console.warn('IPFS upload failed, falling back to local Firestore');

@@ -5,9 +5,8 @@
 /* - Kept Tailwind base/components/utilities, shadcn vars, #FFD700 gold, #F5F5DC beige (Day 6). */
 /* - Kept `.premium-video`, `.hd-stream`, `.animate-premium-pulse`, and `loading-sun` animation (Day 4). */
 /* - Solo Tip: Test with `npm run dev`, inspect #FFD700 buttons, check Firestore for style logs. */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../../tailwind.config.ts";
+@import "tailwindcss";
 
 @layer base {
   :root {
@@ -115,5 +114,70 @@
   }
   .hd-stream {
     filter: brightness(1.1) contrast(1.1);
+  }
+
+  @keyframes login-halo-pulse {
+    0% {
+      opacity: 0.2;
+      transform: scale(0.98);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 0.2;
+      transform: scale(0.98);
+    }
+  }
+
+  @keyframes dust-shimmer {
+    0% {
+      opacity: 0.05;
+    }
+    50% {
+      opacity: 0.18;
+    }
+    100% {
+      opacity: 0.05;
+    }
+  }
+
+  @keyframes sun-rise {
+    0% {
+      transform: translateY(14px);
+      opacity: 0.65;
+    }
+    50% {
+      transform: translateY(-8px);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(14px);
+      opacity: 0.65;
+    }
+  }
+
+  .login-sun-halo {
+    background: radial-gradient(circle at 50% 10%, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.08) 40%, transparent 78%);
+    animation: login-halo-pulse 3.8s ease-in-out infinite;
+  }
+
+  .gold-dust-shimmer {
+    animation: dust-shimmer 8s ease-in-out infinite;
+  }
+
+  .sun-rise-loop {
+    animation: sun-rise 2.4s ease-in-out infinite;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.08; }
+    50% { opacity: 0.28; }
+  }
+
+  .star-twinkle {
+    animation: twinkle var(--twinkle-duration, 10s) ease-in-out infinite;
+    animation-delay: var(--twinkle-delay, 0s);
   }
 }

@@ -23,7 +23,13 @@ export async function POST(req: NextRequest) {
 
   const isInfura = /infura\.io/.test(ipfsUrl);
   if (isInfura && !authorization) {
-    return NextResponse.json({error: 'IPFS auth not configured'}, {status: 503});
+    return NextResponse.json(
+      {
+        disabled: true,
+        reason: 'IPFS auth not configured',
+      },
+      {status: 200}
+    );
   }
 
   try {

@@ -57,7 +57,6 @@ export const createUserDocument = async (userData: UserData) => {
     email: userData.email || null,
     phoneNumber: userData.phoneNumber || null,
     createdAt: serverTimestamp(),
-    package: 'free', // Default to free package
     politenessScore: {ethical: 75, communication: 75, listener: 75, topics: 75}, // Start with a neutral score
     verificationLevel: 'level1', // Start at level 1
     olsPoints: 0, // Start with 0 points

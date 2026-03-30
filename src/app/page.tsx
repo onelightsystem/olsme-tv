@@ -9,28 +9,70 @@
 // - Solo Tip: Test with `npm run dev`, visit `/`, check Firestore `ratings`/`logs`/`biofeedback_events`, IPFS CID.
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { auth, db } from '@lib/firebase/config';
 import { useToast } from '@hooks/use-toast';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback, formatErrorLog, generateCorrelationId, formatInfoLog } from '@lib/utils';
-import { collection, addDoc, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, doc, writeBatch } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
 import { Button } from '@components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@components/ui/dialog';
 import { Sun, User, ThumbsUp, ThumbsDown, MessageSquare, ShieldCheck, ArrowRight, StopCircle, Gem } from 'lucide-react';
 import { cn } from '@lib/utils';
 import ChatPanel from '@components/chat/chat-panel';
 import { Alert, AlertTitle, AlertDescription } from '@components/ui/alert';
+import AuthModal from '@components/auth/auth-modal';
+import LoginModal from '@components/chat/login-modal';
+import SubscriptionCards from '@components/landing/subscription-cards';
+import { getUserSubscriptionStatus } from '@lib/subscription';
 
 interface Guest {
   uid: string;
   displayName: string;
-  package: 'free' | 'premium';
+  package: 'free' | 'starter' | 'premium';
   verificationLevel: 'level1' | 'level2' | 'level3';
 }
+
+const STAR_POSITIONS = [
+  { left: '5%', top: '8%', size: 1, duration: 11, delay: 0 },
+  { left: '12%', top: '23%', size: 1.5, duration: 14, delay: 2 },
+  { left: '19%', top: '63%', size: 2, duration: 12, delay: 1 },
+  { left: '31%', top: '82%', size: 1.5, duration: 10, delay: 3 },
+  { left: '44%', top: '57%', size: 2, duration: 8, delay: 5 },
+  { left: '55%', top: '74%', size: 1.5, duration: 14, delay: 2 },
+  { left: '67%', top: '42%', size: 2, duration: 9, delay: 0 },
+  { left: '79%', top: '34%', size: 1.5, duration: 11, delay: 6 },
+  { left: '91%', top: '11%', size: 2, duration: 10, delay: 7 },
+  { left: '3%', top: '77%', size: 1.5, duration: 12, delay: 5 },
+  { left: '22%', top: '5%', size: 2, duration: 11, delay: 5 },
+  { left: '47%', top: '44%', size: 1, duration: 13, delay: 1 },
+  { left: '58%', top: '95%', size: 1.5, duration: 9, delay: 4 },
+  { left: '70%', top: '13%', size: 1, duration: 14, delay: 2 },
+  { left: '82%', top: '47%', size: 2, duration: 10, delay: 8 },
+  { left: '97%', top: '36%', size: 1, duration: 12, delay: 6 },
+  { left: '34%', top: '67%', size: 1.5, duration: 15, delay: 0 },
+  { left: '75%', top: '3%', size: 1, duration: 11, delay: 3 },
+];
+
+const LOGIN_DUST_PARTICLES = [
+  { left: '8%', top: '14%', size: 4, duration: 22, delay: 0 },
+  { left: '18%', top: '72%', size: 6, duration: 30, delay: 3 },
+  { left: '26%', top: '36%', size: 3, duration: 24, delay: 1 },
+  { left: '34%', top: '22%', size: 5, duration: 28, delay: 5 },
+  { left: '42%', top: '68%', size: 4, duration: 26, delay: 2 },
+  { left: '50%', top: '44%', size: 6, duration: 32, delay: 8 },
+  { left: '58%', top: '18%', size: 3, duration: 20, delay: 2 },
+  { left: '64%', top: '78%', size: 5, duration: 27, delay: 6 },
+  { left: '72%', top: '34%', size: 4, duration: 25, delay: 9 },
+  { left: '80%', top: '62%', size: 6, duration: 31, delay: 4 },
+  { left: '88%', top: '24%', size: 4, duration: 23, delay: 7 },
+  { left: '14%', top: '50%', size: 5, duration: 29, delay: 10 },
+  { left: '46%', top: '12%', size: 3, duration: 21, delay: 1 },
+  { left: '66%', top: '52%', size: 4, duration: 24, delay: 11 },
+];
 
 // Retry logic for Firestore writes
 async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: number = 3): Promise<T> {
@@ -39,6 +81,10 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
     try {
       return await operation();
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('write batch can no longer be used after commit')) {
+        throw e;
+      }
       attempts++;
       if (attempts === maxAttempts) throw e;
       await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
@@ -48,13 +94,17 @@ async function withFirestoreRetry<T>(operation: () => Promise<T>, maxAttempts: n
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [isPremium, setIsPremium] = useState(false);
+  const [subscriptionActive, setSubscriptionActive] = useState(false);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [currentGuest, setCurrentGuest] = useState<Guest | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [politenessFeedback, setPolitenessFeedback] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authInitialTab, setAuthInitialTab] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -65,17 +115,21 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        const userDoc = await getDoc(doc(db, 'users', u.uid));
-        setIsPremium(userDoc.exists() && userDoc.data()?.package === 'premium');
-        setLoginOpen(false);
+        const subscription = await getUserSubscriptionStatus(u);
+        setIsPremium(subscription.tier === 'tier2');
+        setSubscriptionActive(subscription.isActive);
+        if (!subscription.isActive) {
+          setLoading(false);
+        }
       } else {
         setIsPremium(false);
+        setSubscriptionActive(false);
         setLoginOpen(true);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [router, toast]);
 
   useEffect(() => {
     // Fetch potential guests
@@ -136,16 +190,28 @@ export default function HomePage() {
         });
       }
     };
-    if (user) {
+    if (user && subscriptionActive) {
       getCameraPermission();
     }
-  }, [user, toast]);
+  }, [user, toast, subscriptionActive]);
 
   const handleStartChat = async () => {
     if (!user) {
       setLoginOpen(true);
       return;
     }
+
+    if (!subscriptionActive) {
+      toast({
+        variant: 'destructive',
+        title: 'Subscription required',
+        description: 'Subscribe to unlock full sessions.',
+        id: 'subscription-required',
+      });
+      router.push('/subscribe');
+      return;
+    }
+
     const correlationId = generateCorrelationId();
     try {
       const batch = writeBatch(db); // Fresh batch
@@ -273,17 +339,129 @@ export default function HomePage() {
 
   if (!user) {
     return (
-      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Login to Begin Random Video Awaken Chat</DialogTitle>
-            <DialogDescription>Sign in to start your mindful chat experience.</DialogDescription>
-          </DialogHeader>
-          <Button asChild>
-            <Link href="/profile">Sign In / Sign Up</Link>
-          </Button>
-        </DialogContent>
-      </Dialog>
+      <main className="relative min-h-screen overflow-x-hidden bg-[#0A0A0A] text-white">
+        {/* ── Background: deep gradient ── */}
+        <div
+          className="pointer-events-none fixed inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at 15% 20%, rgba(255, 215, 0, 0.06), transparent 40%), radial-gradient(circle at 80% 70%, rgba(255, 170, 0, 0.04), transparent 45%)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="pointer-events-none fixed inset-0" aria-hidden="true">
+          {STAR_POSITIONS.map((star, index) => (
+            <span
+              key={`star-${index}`}
+              className="absolute rounded-full bg-white star-twinkle"
+              style={{
+                left: star.left,
+                top: star.top,
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                '--twinkle-duration': `${star.duration}s`,
+                '--twinkle-delay': `${star.delay}s`,
+              } as React.CSSProperties}
+            />
+          ))}
+        </div>
+
+        {/* ── Background: golden dust particles ── */}
+        <div className="pointer-events-none fixed inset-0" aria-hidden="true">
+          {LOGIN_DUST_PARTICLES.map((particle, index) => (
+            <motion.span
+              key={`gold-dust-${index}`}
+              className="absolute rounded-full bg-[#FFD700]"
+              style={{
+                left: particle.left,
+                top: particle.top,
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+              }}
+              animate={{ y: -24, x: 8, opacity: 0.16 }}
+              transition={{
+                duration: particle.duration,
+                repeat: Infinity,
+                repeatType: 'mirror',
+                ease: 'easeInOut',
+                delay: particle.delay,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="absolute left-4 top-4 z-20 flex items-center gap-3 rounded-full border border-[#FFD700]/20 bg-black/30 px-4 py-2 backdrop-blur-md sm:left-6 sm:top-6">
+          <span className="rounded-full bg-[#FFD700]/10 p-2 shadow-[0_0_28px_rgba(255,215,0,0.38)]">
+            <Sun className="h-6 w-6 text-[#FFD700] sm:h-7 sm:w-7" aria-hidden="true" />
+          </span>
+          <span className="text-base font-semibold tracking-wide text-[#FFE7A0] sm:text-lg">olsme.tv</span>
+        </div>
+
+        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 pb-24 pt-28 sm:px-8">
+          <div className="w-full max-w-4xl text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="mx-auto max-w-2xl rounded-[2rem] border border-white/10 bg-black/25 px-6 py-8 backdrop-blur-md"
+            >
+              <h1 className="text-4xl font-bold leading-tight text-white sm:text-5xl md:text-6xl">
+                Begin Your Random Video Awaken Chat
+              </h1>
+              <p className="mt-4 text-base text-gray-300 sm:text-xl">
+                Sign in to start your mindful chat experience.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-4">
+                <Button
+                  variant="outline"
+                  className="min-h-12 rounded-2xl border-white/15 bg-black/20 px-8 text-white hover:bg-white/10 hover:text-white"
+                  onClick={() => {
+                    setAuthInitialTab('signin');
+                    setAuthOpen(true);
+                  }}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  className="min-h-12 rounded-2xl bg-gradient-to-r from-[#FFD700] to-[#FFAA00] px-8 font-bold text-[#0F0F0F] shadow-lg shadow-[#FFD700]/25 hover:shadow-xl hover:shadow-[#FFD700]/35"
+                  onClick={() => {
+                    setAuthInitialTab('signup');
+                    setAuthOpen(true);
+                  }}
+                >
+                  Sign Up
+                </Button>
+              </div>
+            </motion.div>
+
+            <div className="mt-8">
+              <SubscriptionCards
+                onSignUp={() => {
+                  setAuthInitialTab('signup');
+                  setAuthOpen(true);
+                }}
+                onUpgrade={() => {
+                  setAuthInitialTab('signup');
+                  setAuthOpen(true);
+                }}
+              />
+            </div>
+          </div>
+
+          <LoginModal
+            open={loginOpen}
+            onOpenChange={setLoginOpen}
+            onContinue={() => {
+              setLoginOpen(false);
+              setAuthInitialTab('signin');
+              setAuthOpen(true);
+            }}
+          />
+        </div>
+
+        <AuthModal open={authOpen} onOpenChange={setAuthOpen} initialTab={authInitialTab} />
+      </main>
     );
   }
 
