@@ -13,7 +13,7 @@ export const developerLogEntries: LogEntry[] = [
       'Version 0.4.2 restores full Server-Side Rendering via Firebase Hosting + Cloud Run.\n\n' +
       'The Cloud Run 409 revision-conflict bug (firebase-tools #10148 / #10155) is resolved in firebase-tools v15.12.0. ' +
       'All changes from the temporary static export workaround have been cleanly reverted:\n' +
-      '- next.config.ts: removed output: \'export\'\n' +
+      '- next.config.mjs: removed output: \'export\'\n' +
       '- firebase.json: restored frameworksBackend block (us-central1)\n' +
       '- API routes (/api/ipfs, /api/ipfs-upload, /api/verify-turnstile): original POST handlers restored\n' +
       '- PayPal callables and WebRTC signaling are now fully server-side again\n\n' +
