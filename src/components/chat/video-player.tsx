@@ -22,7 +22,7 @@ import { db, auth } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
 import { triggerBiofeedback } from '@lib/utils';
-import { collection, addDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { cn } from '@lib/utils';
 import { getUserSubscriptionStatus } from '@lib/subscription';
 
@@ -66,6 +66,7 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
         })
         .catch(() => setSubscriptionActive(false));
     }
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!subscriptionActive) {
@@ -81,8 +82,8 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       videoRef.current.srcObject = stream;
       videoRef.current.play().catch(async (e: any) => {
         const batch = writeBatch(db);
-        batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'videoPlayerPlay', currentUser?.uid || 'anonymous'));
-        batch.set(collection(db, 'biofeedback_events').doc(), {
+        batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'videoPlayerPlay', currentUser?.uid || 'anonymous'));
+        batch.set(doc(collection(db, 'biofeedback_events')), {
           userId: currentUser?.uid || 'anonymous',
           type: 'error',
           value: 0,
@@ -123,8 +124,8 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
 
     withFirestoreRetry(async () => {
       const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), streamLog);
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'logs')), streamLog);
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: currentUser?.uid || 'anonymous',
         type: `video_${isVideoOn ? 'on' : 'off'}`,
         value: isVideoOn ? 1 : 0,
@@ -133,8 +134,8 @@ export default function VideoPlayer({ isLocal, isVideoOn, isMuted = false, strea
       await batch.commit();
     }).catch(async (e: any) => {
       const batch = writeBatch(db);
-      batch.set(collection(db, 'logs').doc(), formatErrorLog(e, 'videoPlayerLog', currentUser?.uid || 'anonymous'));
-      batch.set(collection(db, 'biofeedback_events').doc(), {
+      batch.set(doc(collection(db, 'logs')), formatErrorLog(e, 'videoPlayerLog', currentUser?.uid || 'anonymous'));
+      batch.set(doc(collection(db, 'biofeedback_events')), {
         userId: currentUser?.uid || 'anonymous',
         type: 'error',
         value: 0,
