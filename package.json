@@ -59,7 +59,7 @@
     "framer-motion": "^12.37.0",
     "genkit": "1.28.0",
     "kubo-rpc-client": "^6.1.0",
-    "lodash": "^4.17.21",
+    "lodash": "^4.18.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.7",
     "node-fetch": "^2.6.7",
