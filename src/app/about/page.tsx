@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { Lock, Heart, Users, Sparkles } from 'lucide-react';
+import { Lock, Heart, Users, Sparkles, Sun } from 'lucide-react';
 import { ExternalLink } from 'lucide-react';
 import DeveloperLogTimeline from '@/components/DeveloperLogTimeline';
+import { useLightTime } from '@olsystem/lt-lh';
 
 export default function AboutPage() {
+  const { hour, day } = useLightTime();
+
   const accessLevels = [
     {
       name: 'Entry Key',
@@ -54,6 +57,47 @@ export default function AboutPage() {
             olsme.tv is a mindful random video chat platform inside the OneLightSystem vision, designed to turn online encounters into more respectful,
             heart-centered conversations. We are building for depth, safety, and awakening energy.
           </p>
+
+          {/* OLS Light Time */}
+          <article className="mx-auto mt-10 max-w-2xl rounded-2xl border border-[#FFD700]/30 bg-[#14110A]/80 p-6 shadow-[0_0_50px_rgba(255,215,0,0.10)] sm:p-8">
+            <h2 className="flex items-center justify-center gap-2 text-center text-2xl font-semibold text-white">
+              <Sun className="h-6 w-6 text-[#FFD700]" aria-hidden="true" />
+              OLS Light Time
+            </h2>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              {/* Light Hour / Dark Hour */}
+              <div
+                className="flex flex-col items-center justify-center rounded-xl p-5 sm:p-6"
+                style={{
+                  background: hour.isLightHour
+                    ? 'linear-gradient(135deg, #B8860B 0%, #FFD700 50%, #FFA500 100%)'
+                    : 'linear-gradient(135deg, #0A0A0A 0%, #111111 50%, #1A1A1A 100%)',
+                  border: hour.isDarkHour ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                }}
+              >
+                <span className={`text-sm font-medium uppercase tracking-wider ${hour.isLightHour ? 'text-black/60' : 'text-white/50'}`}>
+                  {hour.isLightHour ? 'Light Hour' : 'Dark Hour'}
+                </span>
+                <span className={`mt-1 text-4xl font-bold sm:text-5xl ${hour.isLightHour ? 'text-black' : 'text-white'}`}>
+                  {hour.lightTime}
+                </span>
+              </div>
+
+              {/* Light Day */}
+              <div className="flex flex-col items-center justify-center rounded-xl p-5 sm:p-6"
+                style={{ background: 'linear-gradient(135deg, #0B3D0B 0%, #1A5C1A 50%, #2E7D2E 100%)' }}>
+                <span className="text-sm font-medium uppercase tracking-wider text-white/60">Light Day</span>
+                <span className="mt-1 text-4xl font-bold text-white sm:text-5xl">{(day.day - 1) % 365}<span className="text-2xl sm:text-3xl">LD</span></span>
+              </div>
+            </div>
+
+            <p className="mt-5 text-center text-sm leading-relaxed text-gray-400">
+              We are now using the official OneLightSystem OLS Light Time system.
+              Light Hour (LH) shows your position in the natural solar day.
+              Light Day (LD) tracks progress since the Winter Solstice.
+            </p>
+          </article>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-white/10 bg-[#111111]/80 p-6">
