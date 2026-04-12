@@ -1,33 +1,31 @@
-# CLAUDE.local.md — Local-Only Instructions (not committed)
+# CLAUDE.local.md — Project Development Notes
 
 ## Environment
 
-- macOS dev machine
-- Firebase project: studio-4615914296
-- Live URL: https://olsme.tv
-- Dev server: http://localhost:9002
+- Primary development environment: local macOS setup
+- Firebase project: refer to the repository's configured project/alias locally
+- Live URL: refer to the deployed hosting domain for the current environment
+- Dev server: local development server URL and port are defined by local tooling/config
 
 ## Local Workflow
 
 ```bash
-npm run dev                # Start dev server (webpack, port 9002)
-firebase emulators:start   # Local Firebase emulators (if needed)
-firebase deploy --only functions,hosting  # Deploy both
+npm run dev                              # Start the local dev server
+firebase emulators:start                 # Local Firebase emulators (if needed)
+firebase deploy --only functions,hosting # Deploy both
 ```
 
 ## Security Notes
 
-- The root PAYPAL_*.md files (PAYPAL_CODE_REFERENCE.md, PAYPAL_DEPLOYMENT_SUMMARY.md,
-  PAYPAL_INTEGRATION_COMPLETE.md, PAYPAL_QUICK_REFERENCE.md) are currently tracked in git.
-  They contain no secrets but reveal internal architecture (Firestore collections, custom claims
-  structure, error codes, validation logic). Consider moving to docs/ or .gitignore if repo
-  becomes public.
-- `.env.local` contains NEXT_PUBLIC_PAYPAL_CLIENT_ID — never commit .env files.
-- PayPal secrets are in Firebase Functions config (`firebase functions:config:get paypal`).
+- Repository documentation may describe implementation details; avoid adding secrets or
+  unnecessary environment-specific identifiers to committed markdown files.
+- `.env.local` and other local environment files must never be committed.
+- Keep PayPal and other service secrets in managed configuration/secrets systems rather than
+  committed files.
 
 ## Branch Convention
 
-- Current branch: 96/12.8
+- Use the team's current feature-branch naming convention.
 - Default branch: main
 
 ## Personal Preferences
