@@ -93,10 +93,10 @@ style={{ background: 'linear-gradient(135deg, #0A0A0A 0%, #111111 50%, #1A1A1A 1
 1. `npm view @olsystem/lt-lh version` — check latest
 2. `npm install @olsystem/lt-lh@latest`
 3. Check if `LightDayInfo` now exposes `dayOfYear` (see dist/index.d.ts)
-4. If yes: replace `(day.day - 1) % 365` with `day.dayOfYear` in [src/app/about/page.tsx](../../src/app/about/page.tsx)
+4. If yes: replace `(day.day - 1) % 365` with `day.dayOfYear` in [src/app/about/page.tsx](../../../src/app/about/page.tsx)
 5. Run `npm run check:types && npm run build`
 
-See [docs/LT-LH-PACKAGE-SUGGESTION.md](../../docs/LT-LH-PACKAGE-SUGGESTION.md) for the open `dayOfYear` request to the package maintainer.
+See [docs/LT-LH-PACKAGE-SUGGESTION.md](../../../docs/LT-LH-PACKAGE-SUGGESTION.md) for the open `dayOfYear` request to the package maintainer.
 
 ---
 
