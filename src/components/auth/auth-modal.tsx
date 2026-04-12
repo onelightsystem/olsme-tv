@@ -104,7 +104,7 @@ export default function AuthModal({ open, onOpenChange, initialTab = 'signin' }:
     }
   };
 
-  const handleTwitter = async () => {
+  const handleX = async () => {
     try {
       await signInWithX();
       onOpenChange(false);
@@ -270,7 +270,7 @@ export default function AuthModal({ open, onOpenChange, initialTab = 'signin' }:
             <Button
               type="button"
               variant="outline"
-              onClick={handleTwitter}
+              onClick={handleX}
               className="min-h-12 border-white/20 bg-black/25 text-gray-100 hover:border-[#FFD700]/45 hover:bg-black/40"
             >
               <XLogo className="mr-2 h-4 w-4" />
