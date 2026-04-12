@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Lock, Heart, Users, Sparkles, Sun } from 'lucide-react';
-import { ExternalLink } from 'lucide-react';
+import { Lock, Heart, Users, Sparkles, Sun, ExternalLink } from 'lucide-react';
 import DeveloperLogTimeline from '@/components/DeveloperLogTimeline';
 import { useLightTime } from '@olsystem/lt-lh';
 
