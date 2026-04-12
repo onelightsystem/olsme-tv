@@ -6,6 +6,9 @@
 // - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['@olsystem/lt-lh'],
+  // turbopack: {} — used by Firebase deploy (next build defaults to Turbopack in Next.js 16)
+  // webpack: used by local dev/build (next dev --webpack / next build --webpack)
   turbopack: {},
   typescript: {
     ignoreBuildErrors: true, // MVP speed (Month 1)

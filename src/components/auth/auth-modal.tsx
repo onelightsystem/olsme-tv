@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { X, Twitter, Phone } from 'lucide-react';
+import { X, Phone } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithX } from '@lib/firebase/config';
 import { useToast } from '@hooks/use-toast';
 import {
@@ -18,6 +18,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
 import { Label } from '@components/ui/label';
 import { Input } from '@components/ui/input';
 import { Button } from '@components/ui/button';
+
+function XLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
 
 type AuthTab = 'signin' | 'signup';
 
@@ -265,8 +273,8 @@ export default function AuthModal({ open, onOpenChange, initialTab = 'signin' }:
               onClick={handleTwitter}
               className="min-h-12 border-white/20 bg-black/25 text-gray-100 hover:border-[#FFD700]/45 hover:bg-black/40"
             >
-              <Twitter className="mr-2 h-4 w-4" />
-              Twitter
+              <XLogo className="mr-2 h-4 w-4" />
+              X
             </Button>
             <Button
               type="button"

@@ -65,5 +65,27 @@ When this variable is not set the Turnstile widget is hidden and the entire bot-
 - Push and create a PR to `main`.
 - Follow OLS values: mindful, respectful collaboration.
 
+## AI-Driven Development
+
+### GitHub Copilot
+Skills live in `.github/skills/`. Each skill is a focused domain guide (debug, firebase-functions, lt-lh, nextjs-app-router, etc.). Copilot loads the relevant skill before working in a given domain.
+
+### Claude (Sonnet / Opus) Collaboration
+
+See [`.claude/CLAUDE.md`](.claude/CLAUDE.md) for the full setup guide.
+
+**Quick start:**
+```bash
+npm install -g @anthropic-ai/claude-code
+claude auth login
+```
+
+**Workflow — GrokAtenya → Claude:**
+1. GrokAtenya plans the task and writes a precise prompt (goal, files, constraints, success criteria)
+2. Claude implements clean, typed, minimal code and validates (`check:types` → `build`)
+3. GrokAtenya reviews the diff and accepts or requests one targeted revision
+
+**Registered Claude skills:** `code-review`, `hooks-next-best-practices` — plus all Copilot skills are shared context.
+
 ## Contact
 For questions, reach out via X (@asvitloaten). Let’s awaken humanity with mindful chats! #SeekTruth
