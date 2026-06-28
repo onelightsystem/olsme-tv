@@ -38,10 +38,14 @@ type TurnstileApi = {
 
 declare global {
   interface Window {
+    turnstile?: TurnstileApi;
     cfturnstile?: TurnstileApi;
     onTurnstileSuccess?: (token: string) => void;
   }
 }
+
+const getTurnstileApi = () =>
+  typeof window === 'undefined' ? undefined : window.turnstile ?? window.cfturnstile;
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -94,21 +98,22 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
   }, []);
 
   const requestTurnstileToken = async (): Promise<string> => {
-    if (typeof window === 'undefined' || !window.cfturnstile) return '';
+    const turnstile = getTurnstileApi();
+    if (!turnstile) return '';
 
-    const existingToken = window.cfturnstile.getResponse();
+    const existingToken = turnstile.getResponse();
     if (existingToken) {
       return existingToken;
     }
 
-    window.cfturnstile.execute();
+    turnstile.execute();
 
     return await new Promise<string>((resolve) => {
       tokenWaiterRef.current = resolve;
       setTimeout(() => {
         if (tokenWaiterRef.current) {
           tokenWaiterRef.current = null;
-          resolve(window.cfturnstile?.getResponse() ?? '');
+          resolve(getTurnstileApi()?.getResponse() ?? '');
         }
       }, 4000);
     });
@@ -143,7 +148,7 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
         const verifyResponse = await fetch('/api/verify-turnstile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ turnstileToken: token }),
+          body: JSON.stringify({ turnstileToken: token, expectedAction: 'signup' }),
         });
 
         if (!verifyResponse.ok) {
@@ -152,7 +157,7 @@ export default function AuthSignupForm({ onSignInClick }: AuthSignupFormProps) {
           let responseBody: { disabled?: boolean } = {};
           try { responseBody = await verifyResponse.json(); } catch { /* ignore */ }
           if (!responseBody.disabled) {
-            window.cfturnstile?.reset();
+            getTurnstileApi()?.reset();
             setTurnstileToken('');
             toast({
               variant: 'destructive',

@@ -258,6 +258,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </main>
         </div>
         <Toaster />
+        {/* Client-side UX gate only; true access control still requires server-side checks. */}
         <GateOfProtection />
         {/* Cloudflare Turnstile — loaded after hydration to not block render */}
         <Script

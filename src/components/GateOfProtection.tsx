@@ -24,18 +24,24 @@ interface TurnstileRenderOptions {
   'error-callback'?: (errorCode?: string) => void;
 }
 
+type TurnstileApi = {
+  render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
+  reset: (widgetId?: string) => void;
+  getResponse: (widgetId?: string) => string | undefined;
+  remove: (widgetId?: string) => void;
+};
+
 declare global {
   interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
-      reset: (widgetId?: string) => void;
-      getResponse: (widgetId?: string) => string | undefined;
-      remove: (widgetId?: string) => void;
-    };
+    turnstile?: TurnstileApi;
+    cfturnstile?: TurnstileApi;
   }
 }
 
 type GateState = 'waiting-script' | 'idle' | 'verifying' | 'error';
+
+const getTurnstileApi = () =>
+  typeof window === 'undefined' ? undefined : window.turnstile ?? window.cfturnstile;
 
 // Stable particle positions — no random values to avoid hydration mismatch
 const PARTICLES = [
@@ -65,7 +71,8 @@ export default function GateOfProtection() {
   const renderWidget = useCallback(() => {
     if (!containerRef.current) return;
     if (widgetIdRef.current) return; // already rendered
-    if (!window.turnstile) return;
+    const turnstile = getTurnstileApi();
+    if (!turnstile) return;
 
     if (!SITE_KEY) {
       if (process.env.NODE_ENV === 'production') {
@@ -85,7 +92,7 @@ export default function GateOfProtection() {
       return;
     }
 
-    const id = window.turnstile.render(containerRef.current, {
+    const id = turnstile.render(containerRef.current, {
       sitekey: SITE_KEY,
       action: 'gate',
       theme: 'dark',
@@ -108,12 +115,12 @@ export default function GateOfProtection() {
     widgetIdRef.current = id;
   }, []);
 
-  // ---- Poll for window.turnstile (script loads async) ----
+  // ---- Poll for the Turnstile global (script loads async) ----
   const startPolling = useCallback(() => {
     if (typeof window === 'undefined') return;
 
     // Script may already be loaded (e.g. second render or retry)
-    if (window.turnstile) {
+    if (getTurnstileApi()) {
       setGateState('idle');
       renderWidget();
       return;
@@ -126,7 +133,7 @@ export default function GateOfProtection() {
 
     pollIntervalRef.current = setInterval(() => {
       elapsed += POLL_INTERVAL_MS;
-      if (window.turnstile) {
+      if (getTurnstileApi()) {
         clearInterval(pollIntervalRef.current!);
         setGateState('idle');
         renderWidget();
@@ -192,9 +199,10 @@ export default function GateOfProtection() {
   // ---- Clean up Turnstile widget on component unmount ----
   useEffect(() => {
     return () => {
-      if (widgetIdRef.current && window.turnstile) {
+      const turnstile = getTurnstileApi();
+      if (widgetIdRef.current && turnstile) {
         try {
-          window.turnstile.remove(widgetIdRef.current);
+          turnstile.remove(widgetIdRef.current);
         } catch {
           // ignore — widget may already be gone
         }
@@ -225,7 +233,7 @@ export default function GateOfProtection() {
       const res = await fetch('/api/verify-turnstile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ turnstileToken: token }),
+        body: JSON.stringify({ turnstileToken: token, expectedAction: 'gate' }),
       });
 
       const data = (await res.json()) as { success?: boolean; error?: string };
@@ -242,8 +250,9 @@ export default function GateOfProtection() {
         setErrorMsg(
           'Verification did not pass. Please complete the challenge and try again.'
         );
-        if (widgetIdRef.current && window.turnstile) {
-          window.turnstile.reset(widgetIdRef.current);
+        const turnstile = getTurnstileApi();
+        if (widgetIdRef.current && turnstile) {
+          turnstile.reset(widgetIdRef.current);
         }
         setToken('');
       }
@@ -257,9 +266,10 @@ export default function GateOfProtection() {
   const handleRetry = useCallback(() => {
     setErrorMsg(null);
     setToken('');
-    if (widgetIdRef.current && window.turnstile) {
+    const turnstile = getTurnstileApi();
+    if (widgetIdRef.current && turnstile) {
       // Widget is rendered — just reset it
-      window.turnstile.reset(widgetIdRef.current);
+      turnstile.reset(widgetIdRef.current);
       setGateState('idle');
     } else {
       // Widget was never rendered or was removed — start fresh
