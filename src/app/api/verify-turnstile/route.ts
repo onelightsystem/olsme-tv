@@ -14,6 +14,7 @@ type VerifyTurnstileRequestBody = {
   expectedAction?: VerifyTurnstileAction;
 };
 
+// Runtime guard for untrusted JSON input before comparing the verified action.
 const VALID_ACTIONS = new Set<VerifyTurnstileAction>(['signup', 'gate']);
 
 export async function POST(request: Request) {
