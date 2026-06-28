@@ -241,7 +241,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description?.toString() ?? ''} />
-        {/* Instruct AI training crawlers to skip all pages in this app */}
+        {/* Instruct AI training crawlers to skip pages using this layout */}
         <meta name="robots" content="noai, noimageai" />
       </head>
       <body
