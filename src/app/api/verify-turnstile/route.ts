@@ -59,7 +59,8 @@ export async function POST(request: Request) {
     }
 
     const verification = (await verifyResponse.json()) as VerifyTurnstileResponse;
-    // score is only available on Cloudflare Turnstile Enterprise; default to 1 (pass) on free tier.
+    // score is only available on Cloudflare Turnstile Enterprise; on the free tier,
+    // a successful verification will effectively pass this score check because no score is returned.
     const score = typeof verification.score === 'number' ? verification.score : 1;
     const action = typeof verification.action === 'string' ? verification.action : '';
 

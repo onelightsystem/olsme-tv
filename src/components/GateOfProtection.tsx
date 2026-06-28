@@ -55,7 +55,11 @@ const PARTICLES = [
   { left: '56%', top: '88%', size: 3, dur: 4.8, delay: 0.2 },
 ] as const;
 
-/** Client-side UX gate only; true access control still requires server-side checks. */
+/**
+ * Client-side UX gate only.
+ * Server-rendered content still needs server-side checks (for example middleware + httpOnly cookie validation)
+ * if it must be protected from direct HTTP access.
+ */
 export default function GateOfProtection() {
   // Start hidden to avoid SSR/hydration mismatch; mount effect reveals if not verified
   const [visible, setVisible] = useState(false);
