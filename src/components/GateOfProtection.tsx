@@ -291,7 +291,7 @@ export default function GateOfProtection() {
           role="dialog"
           aria-label="Entry verification gate"
           aria-describedby="gate-description"
-          tabIndex={-1}
+          tabIndex={0}
         >
           {/* Sun glow backdrop */}
           <div
