@@ -57,6 +57,7 @@ export default function GateOfProtection() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -67,13 +68,20 @@ export default function GateOfProtection() {
     if (!window.turnstile) return;
 
     if (!SITE_KEY) {
-      // Development: no site key configured — allow bypass with a warning
-      console.warn(
-        '[GateOfProtection] NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set. ' +
-        'Gate is bypassed in dev mode. Set the key for production.'
-      );
-      setToken('__dev_bypass__');
-      setGateState('idle');
+      if (process.env.NODE_ENV === 'production') {
+        setGateState('error');
+        setErrorMsg(
+          'Verification is unavailable. Please refresh the page or contact support if the problem persists.'
+        );
+      } else {
+        // Development: no site key configured — allow bypass with a warning
+        console.warn(
+          '[GateOfProtection] NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set. ' +
+          'Gate is bypassed in dev mode. Set the key for production.'
+        );
+        setToken('__dev_bypass__');
+        setGateState('idle');
+      }
       return;
     }
 
@@ -175,6 +183,12 @@ export default function GateOfProtection() {
     };
   }, [visible]);
 
+  // ---- Focus dialog for keyboard users when it opens ----
+  useEffect(() => {
+    if (!visible) return;
+    dialogRef.current?.focus();
+  }, [visible]);
+
   // ---- Clean up Turnstile widget on component unmount ----
   useEffect(() => {
     return () => {
@@ -260,6 +274,7 @@ export default function GateOfProtection() {
     <AnimatePresence>
       {visible && (
         <motion.div
+          ref={dialogRef}
           key="olsme-gate"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -276,6 +291,7 @@ export default function GateOfProtection() {
           role="dialog"
           aria-label="Entry verification gate"
           aria-describedby="gate-description"
+          tabIndex={-1}
         >
           {/* Sun glow backdrop */}
           <div
