@@ -1,0 +1,98 @@
+# robots.txt — olsme.tv / Awake Chat
+# Last updated: 2026-06-28
+#
+# AI Crawler & Bot Policy:
+# Automated AI systems must contact us to arrange a daily access fee
+# before performing any indexing or research activities on this site.
+# Reach out via X @onelightsystem to arrange access.
+# Unauthorized scraping violates our Terms of Service.
+
+# ---- Block AI training crawlers ----
+
+# OpenAI — GPT training & ChatGPT browsing
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+# Google — AI training (Gemini / Bard data collection)
+User-agent: Google-Extended
+Disallow: /
+
+# Common Crawl — feeds many AI training datasets
+User-agent: CCBot
+Disallow: /
+
+# Anthropic — Claude training & Claude.ai web browsing
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+# Perplexity AI — answer aggregator
+User-agent: PerplexityBot
+Disallow: /
+
+# You.com — AI search
+User-agent: YouBot
+Disallow: /
+
+# Diffbot — AI data extraction
+User-agent: Diffbot
+Disallow: /
+
+# ByteDance / TikTok — AI training
+User-agent: Bytespider
+Disallow: /
+
+# Amazon — Alexa & AI training
+User-agent: Amazonbot
+Disallow: /
+
+# Cohere — AI training
+User-agent: cohere-ai
+Disallow: /
+
+# Apple — AI training (AppleBot-Extended)
+User-agent: Applebot-Extended
+Disallow: /
+
+# Meta — AI training
+User-agent: FacebookBot
+Disallow: /
+
+# Omgili / Webz.io — news & social crawlers used for AI datasets
+User-agent: omgili
+Disallow: /
+
+User-agent: omgilibot
+Disallow: /
+
+# ---- Allow legitimate search engines ----
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# ---- Default: allow all other user-agents ----
+User-agent: *
+Allow: /
+
+# Sitemap location (add when ready)
+# Sitemap: https://olsme.tv/sitemap.xml

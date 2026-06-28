@@ -14,6 +14,8 @@ import './globals.css';
 import { cn } from '@lib/utils';
 import { Toaster } from '@components/ui/toaster';
 import Header from '@components/Header';
+import GateOfProtection from '@components/GateOfProtection';
+import Script from 'next/script';
 import { auth, db } from '@lib/firebase/config';
 import { formatErrorLog } from '@lib/utils';
 import { logToIPFS } from '@lib/ipfs-client';
@@ -239,7 +241,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description?.toString() ?? ''} />
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        {/* Instruct AI training crawlers to skip this page */}
+        <meta name="robots" content="noai, noimageai" />
       </head>
       <body
         className={cn(
@@ -255,6 +258,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </main>
         </div>
         <Toaster />
+        <GateOfProtection />
+        {/* Cloudflare Turnstile — loaded after hydration to not block render */}
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          strategy="afterInteractive"
+          id="cf-turnstile-script"
+        />
       </body>
     </html>
   );
