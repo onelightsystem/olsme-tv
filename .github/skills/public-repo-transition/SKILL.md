@@ -35,6 +35,10 @@ Keywords: public repo, portfolio, investor, olsme.tv, domain retirement, canonic
   official dummy Turnstile test pair only.
 - `docs/PUBLIC_REPO.md` and `docs/DEPLOY.md` added, documenting the audit floor rationale and deploy/secrets
   flow respectively.
+- Root `package.json` `uuid` overrides (previously scoped under genkit/google-gax parents) were **removed**
+  after they broke Cloud Build's `npm ci` for the auto-generated SSR Cloud Function bundle (a mismatch only
+  visible during an actual `firebase deploy`, not local checks). Audit floor moved from ~50 to ~59 findings as a
+  result — see the `dependencies-security` skill's "Firebase SSR deploy" note and `docs/DEPLOY.md`.
 
 ## Domain Migration Checklist
 

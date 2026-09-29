@@ -6,7 +6,7 @@
 This is a public portfolio project from OneLightSystem OLS / GrokAtenya. olsme.tv is open for investors and
 collaborators — see the [About page](https://studio-4615914296-4bd91.web.app/about) for details and contact channels.
 
-Welcome to **olsme.tv**, a mindful random video chat platform under the OneLightSystem (OLS) vision. The app is
+Welcome to **olsme-tv**, a mindful random video chat platform under the OneLightSystem (OLS) vision. The app is
 live at v1.0.1, offering signup/login with a three-tier pricing model (Entry Key, Starter, Premium — see
 `/about` for current pricing). Built with Next.js, Firebase, and WebRTC, olsme.tv counters the toxicity of
 platforms like Ome.tv with AI-driven politeness scoring, biofeedback for calming interactions, and IPFS-backed
@@ -113,4 +113,5 @@ claude auth login
 **Registered Claude skills:** `code-review`, `hooks-next-best-practices` — plus all Copilot skills are shared context.
 
 ## Contact
-For questions, reach out via X (@asvitloaten). Let’s awaken humanity with mindful chats! #SeekTruth
+For questions, reach out via olsme.com/contact
+ Let’s awaken humanity with mindful chats! #SeekTruth

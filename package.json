@@ -93,21 +93,6 @@
   "overrides": {
     "firebase-frameworks": {
       "cookie": "^0.7.0"
-    },
-    "@genkit-ai/ai": {
-      "uuid": "^11.1.1"
-    },
-    "@genkit-ai/tools-common": {
-      "uuid": "^11.1.1"
-    },
-    "genkit": {
-      "uuid": "^11.1.1"
-    },
-    "google-gax": {
-      "uuid": "^11.1.1"
-    },
-    "googleapis-common": {
-      "uuid": "^11.1.1"
     }
   }
 }
