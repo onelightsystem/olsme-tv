@@ -6,35 +6,39 @@
 This is a public portfolio project from OneLightSystem OLS / GrokAtenya. olsme.tv is open for investors and
 collaborators — see the [About page](https://studio-4615914296-4bd91.web.app/about) for details and contact channels.
 
-Welcome to **olsme.tv**, a radiant sub-social department under the OneLightSystem (OLS) iee.aeo, part of the OLS Meditation Education Academy. Version 0.2 is live, offering signup/login for beta testing with free and premium ($4.99/month) packages. Built with Next.js, Firebase, and WebRTC, olsme.tv counters the toxicity of platforms like Ome.tv with AI-driven politeness IDs, biofeedback for calming interactions, and anti-censorship via IPFS. It targets global users seeking truth and connection, launched in Month 1 (Sept 2025) with a $50,000 budget.
+Welcome to **olsme.tv**, a mindful random video chat platform under the OneLightSystem (OLS) vision. The app is
+live at v1.0.1, offering signup/login with a three-tier pricing model (Entry Key, Starter, Premium — see
+`/about` for current pricing). Built with Next.js, Firebase, and WebRTC, olsme.tv counters the toxicity of
+platforms like Ome.tv with AI-driven politeness scoring, biofeedback for calming interactions, and IPFS-backed
+logging for transparency.
 
 ## Project Overview
 
 - **Purpose**: Create a mindful video chat experience with AI politeness scoring, biofeedback (Red Sea wave audio), and decentralized logging (IPFS), fostering authentic connections aligned with Sun Light Meditation principles.
 - **Tech Stack**:
-  - **Frontend**: Next.js 15.5.3 (Turbopack), React, PT Sans, #FFD700 gold accents, Radix dialogs, shadcn/ui.
-  - **Backend**: Firebase (Firestore, Authentication, Cloud Functions), WebRTC for peer-to-peer video.
-  - **AI**: Firebase ML Kit/TensorFlow Lite for politeness analysis (mocked in MVP, sentiment stub in progress).
-  - **Decentralization**: IPFS for logging, Polygon stubs for future politeness IDs.
+  - **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, PT Sans, #FFD700 gold accents, Radix primitives, shadcn/ui.
+  - **Backend**: Firebase (Firestore, Authentication, Cloud Functions v2, Hosting/SSR), WebRTC for peer-to-peer video.
+  - **AI**: Genkit + Google AI (Gemini) for politeness prompt generation, invoked server-side via Cloud Functions.
+  - **Payments**: PayPal (live, server-verified orders and webhooks).
+  - **Decentralization**: IPFS for logging (optional; skipped gracefully if no IPFS credentials are configured).
 - **Features**:
-  - **Version 0.2 (Beta)**: Users can sign up/log in via Email/Phone/Twitter to join beta testing. Free package offers basic WebRTC chats and politeness score averages. Premium package ($4.99/month) unlocks HD streams, custom audio prompts, detailed politeness analytics, and exclusive visuals.
-  - **Verification Levels**: Bronze (<60), Silver (60–79), Gold (80+) based on politeness scores (Ethical, Communication, Listener, Topics).
-  - **User Search**: Search users by `displayName` and `verificationLevel` via Cloud Function (`searchUsers`).
-  - **Admin Dashboard**: Manage users, verification levels, and system status (accessible to admins).
+  - **Pricing**: Entry Key, Starter, and Premium tiers — see the live [About page](https://studio-4615914296-4bd91.web.app/about) for current prices and terms.
+  - **Politeness Badge**: Bronze (<60), Silver (60–79), Gold (80+) computed from politeness scores (Ethical, Communication, Listener, Topics).
+  - **Identity Verification Levels**: separate `level1`/`level2`/`level3` KYC-style progression, reviewed via the admin dashboard.
+  - **User Search**: Search users by `displayName` and verification level via Cloud Function (`searchUsers`).
+  - **Admin Dashboard**: Manage users, verification levels, referrals, and notifications.
   - **Mindfulness**: Meditation prompts during waits (e.g., "Breathe in light, exhale shadows") and biofeedback audio (Red Sea waves or premium audio).
-  - **Anti-Censorship**: IPFS logging for transparency, bypassing elite blocks (e.g., Egypt’s NTRA).
-- **Timeline**: MVP launch in 3-6 months (Dec 2025–Mar 2026), targeting 100K+ users.
-- **Marketing**: Announce on X (@asvitloaten): “olsme.tv beta 0.2 live—mindful chats with signup/login and premium features! #SeekTruth”.
+  - **Anti-Censorship**: Optional IPFS logging for transparency.
 
 ## Getting Started
 
 To run the project locally:
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22+
 - Firebase CLI (`npm install -g firebase-tools`)
-- Twitter Developer API Key/Secret
-- IPFS node or Infura account
+- X (Twitter) Developer API Key/Secret (only needed if testing X sign-in)
+- IPFS node or Infura account (optional)
 
 ### Environment (IPFS)
 

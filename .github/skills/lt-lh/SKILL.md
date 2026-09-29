@@ -18,14 +18,20 @@ Keywords: light time, light hour, LH, dark hour, dh, light day, LD, dayOfYear, l
 
 ## Key Concepts
 
+Current installed version: `@olsystem/lt-lh@0.4.0`.
+
 | Term | Meaning | Example |
 |---|---|---|
 | Light Hour (LH) | Hours 6AM–5PM (1LH–12LH) | `6LH` |
 | Dark Hour (dh) | Hours 6PM–5AM (1dh–12dh) | `3dh` |
-| Light Day (LD) | Day within the current Light Year (0–364) | `110LD` |
-| Absolute day | Total days since epoch Dec 22, 2024 | `476` — do NOT display this |
-| `day.day` | Absolute count (v0.1.3) | Use `(day.day - 1) % 365` for display |
-| `day.dayOfYear` | Per-year day (future version ≥ 0.1.4) | Use directly when available |
+| Light Day (LD) | Day within the current Light Year | `110LD` |
+| Absolute day (`day.day`) | Days since the package's epoch. **Epoch changed in 0.4.0** from `2024-12-22` to
+  `2025-12-23` — do not assume a fixed offset between versions. | varies by version |
+| `day.dayOfYear` | Day within the current Light Year (1–365). **Available since 0.4.0** — use this directly for
+  display, do not derive it from `day.day`. | `110` |
+
+**Do not use the `(day.day - 1) % 365` workaround anymore.** It was only valid against the pre-0.4.0 epoch and
+  will silently produce an off-by-one/wrong value now that the epoch shifted. Always use `day.dayOfYear` directly.
 
 ---
 
@@ -40,8 +46,8 @@ import { useLightTime } from '@olsystem/lt-lh';
 ```tsx
 const { hour, day } = useLightTime();
 
-// Display Light Day correctly:
-const ldDisplay = (day.day - 1) % 365;  // until @olsystem/lt-lh exposes dayOfYear
+// Display Light Day correctly (0.4.0+):
+const ldDisplay = day.dayOfYear;  // 1–365, already per-year — no math needed
 
 // LH vs dh conditional:
 hour.isLightHour  // true = daytime (yellow/gold styling)
@@ -92,9 +98,16 @@ style={{ background: 'linear-gradient(135deg, #0A0A0A 0%, #111111 50%, #1A1A1A 1
 
 1. `npm view @olsystem/lt-lh version` — check latest
 2. `npm install @olsystem/lt-lh@latest`
-3. Check if `LightDayInfo` now exposes `dayOfYear` (see dist/index.d.ts)
-4. If yes: replace `(day.day - 1) % 365` with `day.dayOfYear` in [src/app/about/page.tsx](../../../src/app/about/page.tsx)
-5. Run `npm run check:types && npm run build`
+3. Read `node_modules/@olsystem/lt-lh/dist/index.d.ts` directly for the real shipped API — published versions
+   have changed `LightDayInfo`/`LightTimeConfig` shape and the epoch default before; don't assume the previous
+   version's contract still holds.
+4. Runtime-verify epoch/day-numbering assumptions before trusting a diff:
+   ```bash
+   npx tsx --eval "import('@olsystem/lt-lh').then(m => console.log(m.getLightDay(new Date())));"
+   ```
+5. Update [src/app/about/page.tsx](../../../src/app/about/page.tsx) to use `day.dayOfYear` directly if not
+   already.
+6. Run `npm run check:types && npm run build`
 
 See [docs/LT-LH-PACKAGE-SUGGESTION.md](../../../docs/LT-LH-PACKAGE-SUGGESTION.md) for the open `dayOfYear` request to the package maintainer.
 
@@ -114,6 +127,6 @@ Both must succeed before deploying.
 ## Done Criteria
 
 - `hour.lightTime` displays correctly with conditional LH/dh styling
-- `(day.day - 1) % 365` (or `day.dayOfYear`) shows the per-year day (e.g. 110), not the absolute count (e.g. 476)
+- `day.dayOfYear` (1–365) is used directly for the Light Day display — no `% 365` math against `day.day`
 - `npm run build` passes with Turbopack (no local `file:` path in deps)
 - `firebase deploy --only hosting` completes without module-not-found errors

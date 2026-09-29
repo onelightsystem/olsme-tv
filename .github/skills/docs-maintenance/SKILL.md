@@ -44,6 +44,13 @@ Keywords: docs, blueprint, security doc, project-tree, update documentation, rew
 - Turnstile and PayPal docs must reflect env/config split accurately:
   - public keys in app env,
   - secrets in server/functions env/config.
+- The custom domain `olsme.tv` is not being renewed. Canonical public URL is
+  `https://studio-4615914296-4bd91.web.app`. When updating docs, only rewrite occurrences that are actual
+  clickable/canonical hosts (hosting URLs, sitemap/canonical/og:url, hrefs) — leave `olsme.tv` as-is where it's
+  clearly the product/portfolio name in headings or prose, not a link.
+- `docs/DEPLOY.md` and `docs/PUBLIC_REPO.md` are the canonical references for the deploy/secrets flow and the
+  public-repo security posture respectively. Keep them in sync with `apphosting.yaml`, `.gitignore`, and
+  `.env.example` when any of those change.
 
 ## Done Criteria
 

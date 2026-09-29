@@ -33,6 +33,12 @@ Keywords: nextjs, app router, layout, metadata, use client, hydration, route seg
 
 - Metadata often comes from `src/app/metadata.ts`; guard nullable values.
 - Prefer not to introduce new route groups or file moves unless required.
+- `src/app/layout.tsx` is `'use client'` (it uses hooks for auth/premium-gating state). Next's automatic
+  Metadata API (`metadataBase`, `alternates.canonical`, `openGraph`, etc. exported from `metadata.ts`) does
+  **not** apply to a client-component root layout. `metadata.ts`'s `title`/`description` are manually spliced
+  into a hand-written `<head>` — any new metadata (canonical link, `og:url`, Twitter card tags) must be added
+  the same way, as literal `<link>`/`<meta>` tags in that `<head>`, not by adding fields to the `metadata.ts`
+  export (they would be silently inert).
 
 ## Done Criteria
 
