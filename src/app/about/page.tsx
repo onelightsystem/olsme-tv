@@ -87,7 +87,7 @@ export default function AboutPage() {
               <div className="flex flex-col items-center justify-center rounded-xl p-5 sm:p-6"
                 style={{ background: 'linear-gradient(135deg, #0B3D0B 0%, #1A5C1A 50%, #2E7D2E 100%)' }}>
                 <span className="text-sm font-medium uppercase tracking-wider text-white/60">Light Day</span>
-                <span className="mt-1 text-4xl font-bold text-white sm:text-5xl">{(day.day - 1) % 365}<span className="text-2xl sm:text-3xl">LD</span></span>
+                <span className="mt-1 text-4xl font-bold text-white sm:text-5xl">{day.dayOfYear}<span className="text-2xl sm:text-3xl">LD</span></span>
               </div>
             </div>
 
@@ -163,6 +163,54 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
+          </article>
+
+          <article className="mt-4 rounded-2xl border border-[#FFD700]/20 bg-[#111111]/80 p-6 sm:p-8">
+            <h2 className="flex items-center gap-3 text-2xl font-semibold text-white">
+              <Users className="h-6 w-6 text-[#FFD700]" aria-hidden="true" />
+              Open for Investors &amp; Collaborators
+            </h2>
+            <p className="mt-3 max-w-4xl text-base leading-relaxed text-gray-300">
+              This build is a public portfolio of <span className="font-semibold text-[#FFD700]">OneLightSystem OLS</span> / GrokAtenya.
+              The project is open for investors and collaborators who want to help build mindful, conscious technology.
+              Reach out via the GitHub repository or on X below.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Link
+                href="https://github.com/onelightsystem/olsme-tv"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#FFD700]/35 bg-[#17120A] px-4 py-3 text-sm font-semibold text-[#FFD700] transition-colors hover:bg-[#20180D]"
+                aria-label="View the olsme.tv GitHub repository"
+              >
+                GitHub Repository
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <Link
+                href="https://x.com/asvitloaten"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-black/50"
+                aria-label="Contact on X at asvitloaten"
+              >
+                X @asvitloaten
+              </Link>
+              <Link
+                href="https://x.com/onelightsystem"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-black/50"
+                aria-label="Contact on X at onelightsystem"
+              >
+                X @onelightsystem
+              </Link>
+            </div>
+
+            <p className="mt-4 text-[11px] leading-relaxed text-white/40">
+              AI crawlers and commercial scrapers must request access and arrange a daily access fee before
+              indexing this site (see our AI Crawler &amp; Bot Policy).
+            </p>
           </article>
 
           <article className="group mt-4 rounded-2xl border border-white/10 bg-[#111111]/80 p-6 transition-all duration-300 hover:border-[#FFD700]/30 hover:shadow-[0_0_40px_rgba(255,215,0,0.10)] sm:p-8">

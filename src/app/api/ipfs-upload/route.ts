@@ -1,6 +1,7 @@
 // src/app/api/ipfs-upload/route.ts
 // Server-side route that proxies IPFS uploads so credentials never reach the browser.
 import {NextRequest, NextResponse} from 'next/server';
+import {createIpfsClient} from '@lib/ipfs/kubo-client';
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -33,8 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const {create} = await import('kubo-rpc-client');
-    const ipfs = create({
+    const ipfs = await createIpfsClient({
       url: ipfsUrl,
       headers: authorization ? {authorization} : undefined
     });

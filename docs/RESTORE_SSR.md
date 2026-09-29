@@ -1,116 +1,28 @@
-# Restore SSR Mode – olsme.tv (after Firebase Hosting bug fix)
+# SSR Operations — olsme.tv
 
-**Last updated:** March 28, 2026  
-**Status:** SSR MODE RESTORED (v0.4.2). Static export mode has been removed.
+**Last updated:** September 29, 2026
+**Status:** SSR is the live, current, and only deploy mode. Static export is retired.
 
-> **Completed March 28, 2026:** SSR was successfully restored using firebase-tools v15.12.0.
-> An additional fix was required: `next.config.ts` was renamed to `next.config.mjs` to avoid
-> a CJS/ESM conflict on Cloud Run (the `"type": "module"` in package.json caused the
-> transpiled `.js` config to fail with `ReferenceError: module is not defined in ES module scope`).
-> The `.mjs` extension forces ESM natively, bypassing firebase-frameworks' TS transpilation.
+Hosting: `https://studio-4615914296-4bd91.web.app` (Firebase Hosting + Cloud Run SSR, `frameworksBackend` region
+`us-central1`). This doc describes how the SSR deploy is configured and how to operate/troubleshoot it — it is
+**not** a migration guide off static export. There is nothing to migrate off; that mode was removed in v0.4.2.
 
 ---
 
-## Introduction
+## Current SSR Configuration (reference)
 
-On March 23, 2026, olsme.tv was temporarily switched from SSR (Server-Side Rendering via Firebase Hosting + Cloud Run) to a static HTML export. This was necessary because Firebase Hosting's SSR finalization step was failing with a Cloud Run revision conflict:
+### `next.config.mjs` (not `.ts`)
 
-```
-409 ALREADY_EXISTS: Revision named 'ssrstudio46159142964bd9-00001-qiv'
-with different configuration already exists.
-```
+The config file is `.mjs`, not `.ts`. This is required because `package.json` has `"type": "module"` — a
+transpiled `.ts` config fails on Cloud Run with `ReferenceError: module is not defined in ES module scope`. The
+`.mjs` extension forces native ESM and bypasses firebase-frameworks' TS transpilation step entirely. **Do not
+rename it back to `.ts`.**
 
-This is a known firebase-tools bug tracked in:
-- https://github.com/firebase/firebase-tools/issues/10148
-- https://github.com/firebase/firebase-tools/issues/10155
+There is no `output: 'export'` in this file. If you ever see that key, it does not belong — SSR mode requires
+its absence.
 
-**Use this guide when:**
-- A firebase-tools release confirms the 409 finalization bug is fixed, **and**
-- You want to restore full SSR: server-rendered HTML, faster first paint, dynamic rendering of `/profile`, `/subscribe`, etc.
+### `firebase.json`
 
-**Do not follow this guide until the bug is confirmed fixed** in your installed firebase-tools version.
-
----
-
-## Prerequisites
-
-Before starting:
-
-1. **Update firebase-tools** to the version that resolves the 409 revision conflict:
-   ```bash
-   npm install -g firebase-tools@latest
-   firebase --version   # confirm >= fixed version
-   ```
-2. Confirm `npm run build` still passes on the current codebase.
-3. Have access to the Firebase project: `studio-4615914296-4bd91`.
-
----
-
-## Step-by-Step Revert Instructions
-
-### Step 1 — Remove `output: 'export'` from `next.config.mjs`
-
-**Current (static mode):**
-```ts
-const nextConfig = {
-  // TEMPORARY: static export mode while SSR Cloud Run deploy is blocked (409 bug).
-  // To revert to SSR: remove this line and restore firebase.json frameworksBackend block.
-  output: 'export',
-  turbopack: {},
-  // ...
-};
-```
-
-**After (SSR mode):**
-```ts
-const nextConfig = {
-  turbopack: {},
-  // ...
-};
-```
-
-Simply delete the `output: 'export'` line and the two comment lines above it.
-
----
-
-### Step 2 — Restore `firebase.json` to SSR/frameworks mode
-
-**Current (static mode):**
-```json
-{
-  "functions": {
-    "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR\" run lint",
-      "npm --prefix \"$RESOURCE_DIR\" run build"
-    ],
-    "source": "functions",
-    "runtime": "nodejs22"
-  },
-  "hosting": {
-    "public": "out",
-    "cleanUrls": true,
-    "trailingSlash": false,
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
-  },
-  "emulators": {
-    "functions": { "port": 5001 },
-    "hosting": { "port": 9002 },
-    "auth": { "port": 9099 },
-    "firestore": { "port": 8080 },
-    "ui": { "port": 4001 },
-    "hub": { "port": 4401 }
-  },
-  "firestore": {
-    "rules": "firestore.rules"
-  }
-}
-```
-
-**After (SSR mode)** — replace the `hosting` block:
 ```json
 {
   "functions": {
@@ -131,128 +43,127 @@ Simply delete the `output: 'export'` line and the two comment lines above it.
     "frameworksBackend": {
       "region": "us-central1"
     }
-  },
-  "emulators": {
-    "functions": { "port": 5001 },
-    "hosting": { "port": 9002 },
-    "auth": { "port": 9099 },
-    "firestore": { "port": 8080 },
-    "ui": { "port": 4001 },
-    "hub": { "port": 4401 }
-  },
-  "firestore": {
-    "rules": "firestore.rules"
   }
 }
 ```
 
-> Note: `pinTag: true` has been intentionally left out. That option was part of the troubleshooting path that led to the 409 conflict. Only re-add it if explicitly needed.
+`hosting.source: "."` + `frameworksBackend` is what tells `firebase deploy` to build and run the app as a
+Cloud Run SSR service instead of serving a static `out/` directory. There is no `hosting.public` key in SSR
+mode — if one reappears, that's a static-export config, not this one.
+
+### API routes are live, not stubs
+
+`src/app/api/ipfs/route.ts`, `src/app/api/ipfs-upload/route.ts`, and `src/app/api/verify-turnstile/route.ts`
+are ordinary Next.js App Router POST handlers. They build as `ƒ (Dynamic)` and are bundled into the
+auto-generated SSR Cloud Function (`ssrstudio46159142964bd9`, codebase
+`firebase-frameworks-studio-4615914296-4bd91`). None of them contain `force-static` stubs or block-commented
+handler bodies — if you see that pattern, it's leftover from the old static-export era and should be removed.
 
 ---
 
-### Step 3 — Restore the three API routes from their stub state
-
-During the static export migration, the three API routes were stubbed with a static GET and the original POST handlers were wrapped in a block comment. Restore each file by:
-
-1. Delete everything from `export const dynamic = 'force-static';` through the opening `/* ---- ORIGINAL POST HANDLER` comment.
-2. Uncomment the original POST handler body (remove the `/* ----` opening and `---- END ORIGINAL POST HANDLER ---- */` closing).
-
-Files to restore:
-- `src/app/api/ipfs/route.ts`
-- `src/app/api/ipfs-upload/route.ts`
-- `src/app/api/verify-turnstile/route.ts`
-
----
-
-### Step 4 — Remove the `export` script from `package.json`
-
-**Current (static mode):**
-```json
-"scripts": {
-  "build": "next build",
-  "export": "next build",
-  ...
-}
-```
-
-**After (SSR mode):**
-```json
-"scripts": {
-  "build": "next build",
-  ...
-}
-```
-
-Delete the `"export": "next build"` line.
-
----
-
-### Step 5 — Delete the static `out/` folder
+## Deploy
 
 ```bash
-rm -rf out
-```
-
-This folder is only needed for static deploys. When using SSR, Firebase Hosting frameworks deploys from source directly via the Cloud Run function.
-
----
-
-### Step 6 — Build (SSR mode, no export)
-
-```bash
+npm install        # only if package.json changed since last commit
+npm ci              # must succeed locally before deploying — same strict install Cloud Build runs
+npm run check:lint
+npm run check:types
 npm run build
+firebase deploy --only hosting,functions
 ```
 
-Expected output: routes show as `ƒ (Dynamic)` for API routes, `○ (Static)` for pre-renderable pages. No `out/` folder is created.
+**Last confirmed successful deploy:** September 29, 2026 — `firebase deploy --only hosting,functions` updated
+the SSR function `ssrstudio46159142964bd9` (2nd Gen, Node.js 22, `us-central1`) along with the `default`
+codebase's PayPal/admin callables.
+
+### Known non-fatal warning
+
+The deploy log may show:
+```
+Warning: Global esbuild version (0.28.2) does not match the required version (^0.19.2).
+✘ [ERROR] "external" must be an array of strings
+Unable to bundle next.config.mjs for use in Cloud Functions, proceeding with deploy but problems may be encountered.
+```
+This comes from an esbuild version mismatch pulled in transitively (unrelated to app code). **It does not fail
+the deploy** — hosting still releases and the function still updates. Treat it as noise, not an error to chase.
+
+### Known failure mode: `uuid` override vs. generated SSR lockfile
+
+If `firebase deploy` fails during the functions build step with something like:
+```
+npm error Invalid: lock file's uuid@11.1.1 does not satisfy uuid@9.0.1
+```
+this means a root `package.json` `overrides` entry is forcing a `uuid` version across genkit/google-gax
+parents, but `firebase-tools` generates its **own** `package.json`/`package-lock.json` for the SSR function
+bundle (in `.firebase/<site>/functions/`) independently of the root lockfile — and that generated bundle can
+still resolve a different `uuid` version for the same parent. `rm -rf .firebase` alone does not fix this; the
+mismatch regenerates fresh from the root `package.json` on every deploy.
+
+Fix, in order:
+1. Remove the offending `uuid` override(s) from `package.json` — do not try to force a single `uuid` version
+   across unrelated dependency trees. Let npm resolve it naturally per-parent.
+2. `npm install` to regenerate `package-lock.json`.
+3. `rm -rf .firebase`
+4. `npm ci` — must succeed locally before redeploying.
+5. `firebase deploy --only hosting,functions`
+
+See `docs/DEPLOY.md` and the `dependencies-security` skill's "Firebase SSR deploy" note for the full writeup.
+**Do not respond to this failure by reintroducing static export** — it is a lockfile/override issue, unrelated
+to SSR vs. static rendering.
 
 ---
 
-### Step 7 — Deploy
+## Cloudflare Turnstile (production)
 
-```bash
-firebase deploy --only hosting --project studio-4615914296-4bd91
-```
-
-**Expected success signal:**
-```
-✔  hosting[studio-4615914296-4bd91]: version finalized
-✔  hosting[studio-4615914296-4bd91]: release complete
-✔  Deploy complete!
-Hosting URL: https://studio-4615914296-4bd91.web.app
-```
+- Production uses the **real** Cloudflare Turnstile site key + secret key pair, never the dummy test pair.
+- `TURNSTILE_SECRET_KEY` is provisioned as a Firebase secret (`apphosting.yaml` binds it to the SSR function),
+  never a plaintext env var.
+- The Cloudflare widget's **Hostnames** list must include `studio-4615914296-4bd91.web.app` (and
+  `studio-4615914296-4bd91.firebaseapp.com`) — hostname only, no scheme, no path.
+- Local development uses Cloudflare's dummy test pair (`.env.local`) — never mix a dummy site key with a real
+  secret or vice versa. See `docs/DEPLOY.md` for the full provisioning flow.
 
 ---
 
 ## Verification Checklist
 
-After deploy, confirm the following:
+After any deploy, confirm:
 
-- [ ] Homepage (`/`) loads — check DevTools > Network > first HTML document is server-rendered (look for full HTML content in response, not a bare shell)
+- [ ] `/` loads and is server-rendered (DevTools → Network → first HTML document has full content, not a bare shell)
 - [ ] `/about` renders correctly
 - [ ] `/dev-log` renders correctly
-- [ ] `/subscribe` loads PayPal buttons (client-side SDK still works)
-- [ ] Sign in → `/profile` shows authenticated user data
-- [ ] `/api/verify-turnstile` returns a proper response (not the 503 static stub)
-- [ ] DevTools Console: no `force-static` or static stub errors
-- [ ] DevTools Console: no CORS 403 from callable functions
-- [ ] DevTools Network: first-document response time < 1s (SSR benefit)
+- [ ] `/subscribe` loads PayPal buttons (client-side SDK)
+- [ ] `/api/verify-turnstile` returns a real response (not a 503 or static stub)
+- [ ] DevTools Console: no `force-static` or static-stub errors
+- [ ] DevTools Console: no CORS errors from callable functions
 
 ---
 
-## Rollback
+## Troubleshooting Order (if a deploy fails)
 
-If the 409 bug reappears after updating firebase-tools, revert to static mode immediately:
+Try these in order before considering anything more drastic:
 
-```bash
-# 1. Restore static config in next.config.mjs and firebase.json (re-apply Step 1/2 in reverse)
-# 2. Rebuild and re-export
-npm run build
-# 3. Re-deploy static
-firebase deploy --only hosting --project studio-4615914296-4bd91
-```
+1. `rm -rf .firebase` and redeploy — clears any stale generated bundle.
+2. Confirm your `firebase-tools` version: `firebase --version`. The Cloud Run 409 revision-conflict bug
+   (`firebase/firebase-tools#10148` / `#10155`) is fixed as of v15.12.0 — if you see
+   `409 ALREADY_EXISTS: Revision named '...' with different configuration already exists`, upgrade
+   `firebase-tools` first.
+3. Check for a `uuid`/lockfile mismatch (see "Known failure mode" above) — the most common recent cause of
+   Cloud Build `npm ci` failures for the SSR function.
+4. Re-run `npm ci` locally and confirm it's clean before blaming the deploy pipeline.
 
-Keep the stub pattern in the API routes — they are designed to be toggled safely.
+**Do not reach for static export (`output: 'export'`) as a troubleshooting step.** It was a temporary workaround
+for the now-fixed 409 bug, not a general fallback, and reintroducing it silently breaks all three live API
+routes (they'd need to be re-stubbed) and removes SSR rendering for every dynamic page.
+
+### Historical note (v0.4.1, retired)
+
+From March 23–28, 2026, olsme.tv ran a temporary static HTML export (`output: 'export'`, `firebase.json`
+`hosting.public: "out"`, API routes replaced with static stubs) as a workaround for the Cloud Run 409
+revision-conflict bug above. That configuration is fully removed from the codebase as of v0.4.2 and is not
+documented here — if it's ever needed again as a reference (it shouldn't be), see the git history around the
+v0.4.1 tag/commits rather than resurrecting a static-export doc.
 
 ---
 
-Welcome back to full SSR mode — faster, more dynamic awakening experience.
+SSR is the awakening path — fast, dynamic, fully server-rendered. #SeekTruth

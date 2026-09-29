@@ -30,6 +30,9 @@ Keywords: firestore, modular sdk, doc collection, writeBatch, addDoc, getDoc, qu
 
 - This codebase heavily logs to Firestore (`logs`, `biofeedback_events`, etc.).
 - Keep logging payload structure consistent when patching.
+- `NS_BINDING_ABORTED` on `firestore.googleapis.com/.../Write/channel` requests during Fast Refresh is expected
+  browser behavior (the long-lived channel connection gets aborted and re-opened) — not a functional regression;
+  see the `debug` skill's non-blocking signals list.
 
 ## Done Criteria
 

@@ -16,23 +16,57 @@ olsme.tv v0.4.1 uses Firebase Auth, Firestore Rules, Cloud Functions, Cloudflare
   - `package`
   - `startDate`
   - `paypalOrderId`
-- Client-side attempts to create or modify these fields are blocked by rules.
+- Client-side attempts to create or modify these fields are blocked by rules:
+  ```
+  function serverManagedFields() {
+    return ['isPremium', 'subscriptionTier', 'subscriptionStatus',
+            'package', 'startDate', 'paypalOrderId'];
+  }
+
+  allow create: if request.auth != null
+    && request.auth.uid == userId
+    && !request.resource.data.keys().hasAny(serverManagedFields());
+
+  allow update: if request.auth != null
+    && request.auth.uid == userId
+    && request.resource.data.diff(resource.data).affectedKeys()
+         .hasNone(serverManagedFields());
+  ```
 - `subscriptions` collection writes are limited to admin-claim paths.
 
 ### Authentication and Claims
 
 - Premium status is issued server-side via custom claims after successful server-validated payment flow.
 - Claim reads are implemented in key flows:
-  - `src/app/subscribe/page.tsx` uses `getIdTokenResult().claims` to short-circuit premium users away from the subscribe page.
+  - `src/app/subscribe/page.tsx` uses `getIdTokenResult().claims` to short-circuit premium users away from the subscribe page (checked before mounting the subscription UI, avoiding the paywall flash).
   - `src/app/layout.tsx` refreshes claims on auth state changes.
 - Note: `src/app/layout.tsx` still includes a legacy Firestore snapshot gate for redirect behavior. This gate works, but should be fully claim-only for consistency.
+
+### Manual exploit regression check
+
+Run this after any Firestore rules or subscription-related change (should always be denied):
+
+```typescript
+// Browser console on /subscribe:
+const db = getFirestore();
+await setDoc(doc(db, 'users', auth.currentUser.uid), { isPremium: true }, { merge: true });
+// → expected: "Permission denied" (Firestore rule blocks the write)
+// The /subscribe page itself does not change state either, since its gating reads
+// from custom claims (unaffected by the Firestore write attempt), not from this document.
+```
 
 ### Turnstile Bot Protection
 
 - Signup includes Turnstile protection with site key from `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
 - Turnstile secret is read server-side from `TURNSTILE_SECRET_KEY`.
 - `src/app/api/verify-turnstile/route.ts` accepts token verification payloads and rejects credential-style extra fields (email/password/name), preventing leakage through the verification endpoint.
-- If the site key is missing in development, the app logs a fallback warning for visibility.
+- Signup is split into two stages so credentials never touch the verification endpoint: stage 1 sends only
+  `{ turnstileToken }` to `/api/verify-turnstile`; stage 2 (after verification succeeds) calls
+  `signUpWithEmail()` locally with the actual credentials.
+- If the site key is missing in development, the app logs a fallback warning for visibility; the Turnstile
+  widget is hidden and the whole bot-verification flow is skipped so local signup still works.
+- See `docs/DEPLOY.md` for the dummy-vs-real key pair, Cloudflare Hostnames requirement, and the
+  `firebase functions:secrets:set TURNSTILE_SECRET_KEY` provisioning flow.
 
 ### PayPal and Payments
 
@@ -71,14 +105,14 @@ olsme.tv v0.4.1 uses Firebase Auth, Firestore Rules, Cloud Functions, Cloudflare
 - Add rate limiting for chat/session initiation (Cloud Armor or callable-level controls).
 - Add VPN/proxy detection stub for restricted-region policy enforcement.
 - Integrate `eslint-plugin-security` and tune rules for TypeScript + Next.js patterns.
+- Enable Firebase App Check to restrict callables (`createPaypalOrder`, `capturePaypalOrder`, etc., all
+  currently `cors: true`) to verified app instances only.
 
 ## Audit and Monitoring
 
 - Monitor Firebase logs for `permission-denied`, suspicious callable failures, and repeated payment retries.
 - Use Cloudflare protections and maintain Turnstile verification thresholds (target score >= 0.3 where applicable).
-- Run manual exploit regression test after rules or subscription changes:
-  - attempt `setDoc({ isPremium: true }, { merge: true })` from client
-  - expected result: denied by Firestore rules
+- Run the manual exploit regression check above after any rules or subscription-related change.
 - Validate premium entitlement path end-to-end after deployment:
   - payment capture succeeds
   - custom claims update is visible

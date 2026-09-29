@@ -63,6 +63,19 @@ Keywords: debug, fix error, typecheck fail, tsconfig, firebase error, audit, vul
 	- preload-not-used font warnings during HMR.
 	- CSS parser warnings like dropped `-webkit-text-size-adjust` or `opacity` values during hot reload.
 
+## Known Recurring Root Causes (this repo)
+
+- **Turnstile local 400 on `/api/verify-turnstile`**: Cloudflare's dummy "always passes" test key pair
+  (`1x00000000000000000000AA` / matching secret) returns `success: true` but never echoes an `action` field —
+  only `metadata.result_with_testing_key: true`. Don't hard-require `action === expectedAction` without
+  checking for this flag first, or every dev-mode verification will be rejected even though Cloudflare approved it.
+- **500s on `_next/static/...js` / CSS chunks with "Loading failed for the script"**: a stale webpack dev-server
+  cache after live-editing a file imported by `layout.tsx` while the dev server was already running. Not a code
+  bug — kill the dev server, `rm -rf .next`, restart `npm run dev`.
+- **Firefox-only `Error in parsing value for 'opacity: undefined'`**: caused by Framer Motion `motion.div`s with
+  a `repeat: Infinity` keyframe `animate` array and no `exit` prop. When the parent `AnimatePresence` unmounts,
+  Framer Motion has no defined terminal value for the interrupted loop. Fix: add an explicit `exit={{ opacity: 0 }}`.
+
 ## Output Expectations
 
 When finishing a debug task, include:

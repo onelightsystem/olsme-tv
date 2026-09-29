@@ -241,6 +241,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <title>{metadata.title?.toString()}</title>
         <meta name="description" content={metadata.description?.toString() ?? ''} />
+        {/* Canonical public URL: custom domain olsme.tv is not renewed, Firebase Hosting URL is authoritative */}
+        <link rel="canonical" href="https://studio-4615914296-4bd91.web.app" />
+        <meta property="og:url" content="https://studio-4615914296-4bd91.web.app" />
+        <meta name="twitter:site" content="@onelightsystem" />
         {/* Instruct AI training crawlers to skip all pages (inherited by all child pages) */}
         <meta name="robots" content="noai, noimageai" />
       </head>

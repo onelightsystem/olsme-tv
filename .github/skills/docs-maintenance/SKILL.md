@@ -33,8 +33,11 @@ Keywords: docs, blueprint, security doc, project-tree, update documentation, rew
 
 4. Validate
 - Re-read final file for consistency and formatting.
-- If updating project tree, regenerate from workspace:
-  - `tree -I 'node_modules|.next|out|lib' > docs/project-tree.md`
+- If updating project tree, regenerate from **tracked files only** (a raw `tree -I ...` filesystem scan includes
+  untracked/gitignored local clutter and gives a misleading picture of what's actually in the public repo):
+  ```bash
+  git ls-files | tree --fromfile --noreport > /tmp/tree.txt   # then wrap in a fenced code block
+  ```
 - Provide unified diff when requested.
 
 ## Repo-Specific Notes
@@ -44,6 +47,22 @@ Keywords: docs, blueprint, security doc, project-tree, update documentation, rew
 - Turnstile and PayPal docs must reflect env/config split accurately:
   - public keys in app env,
   - secrets in server/functions env/config.
+- The custom domain `olsme.tv` is not being renewed. Canonical public URL is
+  `https://studio-4615914296-4bd91.web.app`. When updating docs, only rewrite occurrences that are actual
+  clickable/canonical hosts (hosting URLs, sitemap/canonical/og:url, hrefs) — leave `olsme.tv` as-is where it's
+  clearly the product/portfolio name in headings or prose, not a link.
+- `docs/DEPLOY.md` and `docs/PUBLIC_REPO.md` are the canonical references for the deploy/secrets flow and the
+  public-repo security posture respectively. Keep them in sync with `apphosting.yaml`, `.gitignore`, and
+  `.env.example` when any of those change.
+- **Watch for duplicative "session summary" docs.** Feature-implementation sessions sometimes leave behind
+  multiple overlapping markdown files (e.g. this repo previously had `PAYPAL_CODE_REFERENCE.md`,
+  `PAYPAL_DEPLOYMENT_SUMMARY.md`, `PAYPAL_INTEGRATION_COMPLETE.md`, `PAYPAL_LIVE_INTEGRATION.md`,
+  `PAYPAL_QUICK_REFERENCE.md`, and a separate `SECURITY_HARDENING.md` overlapping `security.md` — all removed
+  or merged during a public-repo doc audit). None contained secrets, but they were stale (deprecated
+  `functions.config()` pattern, old Node version, contradicted current `docs/DEPLOY.md`/`blueprint.md`) and
+  confusing for a public portfolio repo. Prefer one canonical doc per topic (`blueprint.md` for feature status,
+  `security.md` for security posture, `DEPLOY.md` for deploy steps) over a growing pile of dated summaries —
+  fold new session findings into the canonical doc instead of creating a new file.
 
 ## Done Criteria
 

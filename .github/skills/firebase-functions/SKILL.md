@@ -37,6 +37,14 @@ Keywords: firebase-functions, onCall, onRequest, auth trigger, CallableRequest, 
 - Functions code lives in `functions/src`.
 - Keep exports stable when possible to avoid breaking deployed entry points.
 - Prefer targeted fixes over reorganizing function files.
+- There are **two separate Cloud Functions codebases** on deploy: the named callables in `functions/src/index.ts`
+  (codebase `default` — `createPaypalOrder`, `paypalWebhook`, etc.) and the auto-generated Next.js SSR function
+  (codebase `firebase-frameworks-studio-4615914296-4bd91`, function name `ssrstudio46159142964bd9`) that serves
+  every page and App Router API route (`/api/verify-turnstile`, `/api/ipfs`, `/api/ipfs-upload`). They do not
+  share environment/secret bindings.
+- The SSR function's env/secrets are configured via `apphosting.yaml`'s `env:` block (e.g.
+  `TURNSTILE_SECRET_KEY`), not `functions/.env`. Provision/rotate with `firebase functions:secrets:set <NAME>`,
+  then `firebase deploy --only functions` for the new version to take effect. See `docs/DEPLOY.md`.
 
 ## Done Criteria
 
