@@ -42,6 +42,22 @@ firebase functions:secrets:set TURNSTILE_SECRET_KEY
   priority means `.env.production.local`'s `NEXT_PUBLIC_TURNSTILE_SITE_KEY` wins when both are present. Put the
   real site key in `.env.production.local` (gitignored, same as `.env.local`) rather than overwriting
   `.env.local`'s dummy value.
+- **`firebase deploy` runs its own `next build` locally**, in the same shell you invoke it from — `firebase.json`
+  frameworks integration ignores the `build` script in `package.json` (see the deploy log's "custom build...is
+  being ignored" warning) and calls `next build` directly, which reads whatever `.env.production.local`/
+  `.env.local` files exist in your working directory at that moment. There is no separate CI/Cloud Build step
+  that rebuilds the Next.js app with different env files — the artifact uploaded is built on your machine.
+- **Env priority gotcha:** `process.env` (a value already exported in the *shell* running `firebase deploy`)
+  outranks every `.env*` file. If `NEXT_PUBLIC_TURNSTILE_SITE_KEY` was ever `export`ed in that terminal session
+  (e.g. while testing locally), it silently wins over `.env.production.local` during the deploy build, and the
+  production bundle ships the dummy key even though `.env.production.local` looks correct. Check
+  `echo $NEXT_PUBLIC_TURNSTILE_SITE_KEY` in the deploying shell (should be empty) before deploying, or open a
+  fresh terminal.
+- `next.config.mjs` logs `NEXT_PUBLIC_TURNSTILE_SITE_KEY resolved as: DUMMY test pair` / `real key (value
+  redacted)` / `unset` every time it runs (`next dev`, `next build`, `firebase deploy`'s internal build) — check
+  this line in the deploy log first if production rejects every verification. `/api/verify-turnstile` also logs
+  a `KEY PAIR MISMATCH` line server-side (Cloud Function logs, not client-visible) if the site key and secret
+  key are from different pairs (one dummy, one real).
 
 ## 3. Cloudflare Turnstile widget configuration
 
@@ -53,6 +69,24 @@ In the Cloudflare Turnstile dashboard, the widget's **Hostnames** list must incl
 
 **Local development uses Cloudflare's dummy test key pair** (`.env.example`). **Production uses the real key
 pair.** Never mix a dummy site key with a real secret or vice versa — `siteverify` will reject every token.
+
+**This Hostnames list is a Cloudflare dashboard setting — no code change can add a hostname to it.** If
+production shows real (non-dummy) keys per the diagnostics above and the pair matches, but verification still
+fails, confirm the live hostname is actually present in this list before looking anywhere else.
+
+### Live debug checklist (production rejection)
+
+1. **Network tab → the `api.js` request URL** (or the widget's rendered script tag) — confirm the `sitekey`
+   query param is the real key, not `1x00000000000000000000AA`.
+2. **Network tab → `POST /api/verify-turnstile` → Response** — read the JSON body directly (`success`, `code`,
+   `errorCodes`); a 400 never has an empty body.
+3. **Server logs (Firebase Console → Functions → `ssrstudio46159142964bd9` → Logs)** — look for
+   `[next.config.mjs] NEXT_PUBLIC_TURNSTILE_SITE_KEY resolved as: ...` (from the build) and
+   `[verify-turnstile] key pair check` / `KEY PAIR MISMATCH` (from the request).
+4. **Cloudflare dashboard → Turnstile → widget → Hostnames** — confirm
+   `studio-4615914296-4bd91.web.app` is listed exactly (no scheme, no path).
+5. **Ignore as unrelated noise**: `opacity: undefined` console warnings, `WebGL context was lost` (Turnstile's
+   canvas fallback), and "Apple Symbols" font-sanitizer errors — none of these affect verification.
 
 ## 4. Deploy commands
 

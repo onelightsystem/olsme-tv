@@ -11,6 +11,18 @@
 // (0.28.1) comes transitively from genkit-cli -> @genkit-ai/tools-common -> tsx. Pinning
 // esbuild down would likely break tsx/genkit-cli, so no safe local fix exists yet; deploy
 // currently proceeds with a warning and does not block hosting/functions releases.
+
+// Build-time diagnostic (this file runs on the build machine / dev server only — it is never
+// bundled into the client, so this cannot leak to the browser): confirms which Turnstile site
+// key pair `next build` actually resolved. Next's env priority puts `process.env` above every
+// `.env*` file, so a stray shell-exported NEXT_PUBLIC_TURNSTILE_SITE_KEY silently outranks
+// `.env.production.local` — this line is the fastest way to catch that in the deploy log.
+const turnstileSiteKeyAtBuild = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+console.log(
+  '[next.config.mjs] NEXT_PUBLIC_TURNSTILE_SITE_KEY resolved as:',
+  !turnstileSiteKeyAtBuild ? 'unset' : turnstileSiteKeyAtBuild.startsWith('1x0000') ? 'DUMMY test pair' : 'real key (value redacted)'
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@olsystem/lt-lh'],
