@@ -1,5 +1,11 @@
 # olsme.tv - Mindful Video Chat Platform
 
+**Live:** https://studio-4615914296-4bd91.web.app
+**About & mission:** https://studio-4615914296-4bd91.web.app/about
+
+This is a public portfolio project from OneLightSystem OLS / GrokAtenya. olsme.tv is open for investors and
+collaborators — see the [About page](https://studio-4615914296-4bd91.web.app/about) for details and contact channels.
+
 Welcome to **olsme.tv**, a radiant sub-social department under the OneLightSystem (OLS) iee.aeo, part of the OLS Meditation Education Academy. Version 0.2 is live, offering signup/login for beta testing with free and premium ($4.99/month) packages. Built with Next.js, Firebase, and WebRTC, olsme.tv counters the toxicity of platforms like Ome.tv with AI-driven politeness IDs, biofeedback for calming interactions, and anti-censorship via IPFS. It targets global users seeking truth and connection, launched in Month 1 (Sept 2025) with a $50,000 budget.
 
 ## Project Overview
@@ -47,11 +53,26 @@ Without auth on an Infura URL, IPFS uploads are skipped and the app falls back t
 
 ### Environment (Turnstile)
 
-Cloudflare Turnstile bot verification requires a public site key. Set the following in `.env.local`:
+Cloudflare Turnstile bot verification requires a public site key **and** a matching private secret key. Set both in `.env.local`:
 
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — your Cloudflare Turnstile site key (get one at https://dash.cloudflare.com/turnstile)
+- `TURNSTILE_SECRET_KEY` — the matching secret key, used server-side in `/api/verify-turnstile`
 
-When this variable is not set the Turnstile widget is hidden and the entire bot-verification flow (including the `/api/verify-turnstile` call) is skipped — signup proceeds directly. **Always set this variable in production.**
+For local development you can use Cloudflare's official dummy test pair instead of real keys (always passes, no Cloudflare account needed):
+
+```
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+```
+
+**The site key and secret key must be from the same pair** (real or dummy) — mixing a test site key with a real/mismatched secret (or vice versa) causes Cloudflare's `siteverify` to reject every token, and `/api/verify-turnstile` will return 400 with no visible reason on the client (check the terminal running `next dev` for the logged `error-codes`).
+
+When `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is not set the Turnstile widget is hidden and the entire bot-verification flow (including the `/api/verify-turnstile` call) is skipped — signup proceeds directly. **Always set both variables in production.**
+
+**Production (live Hosting) requirements:**
+- Use the **real** Cloudflare Turnstile site key + secret key — never the dummy test pair above.
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is a public build-time env var; `TURNSTILE_SECRET_KEY` is provisioned as a Firebase App Hosting **secret** (see `apphosting.yaml`), never committed.
+- In the Cloudflare Turnstile dashboard, the widget's **Hostnames** list must include `studio-4615914296-4bd91.web.app` (hostname only — no `https://` scheme, no path). Requests from an unlisted hostname are rejected by Cloudflare regardless of key validity.
 
 ## Testing
 - Run `npm run dev`, visit `http://localhost:9002`.

@@ -1,6 +1,6 @@
 {
   "name": "olsme-tv",
-  "version": "1.0.1",
+  "version": "1.0.1b",
   "type": "module",
   "private": true,
   "scripts": {
@@ -24,7 +24,7 @@
     "@genkit-ai/next": "1.42.0",
     "@helia/core": "^0.0.0",
     "@hookform/resolvers": "^5.9.1",
-    "@olsystem/lt-lh": "^0.1.3",
+    "@olsystem/lt-lh": "^0.4.0",
     "@paypal/react-paypal-js": "^10.5.2",
     "@radix-ui/react-accordion": "^1.2.20",
     "@radix-ui/react-alert-dialog": "^1.1.23",
@@ -59,11 +59,11 @@
     "firebase-functions": "^7.4.0",
     "framer-motion": "^13.4.4",
     "genkit": "1.42.0",
-    "kubo-rpc-client": "^6.1.0",
+    "kubo-rpc-client": "^7.1.0",
     "lodash": "^4.18.1",
     "lucide-react": "^1.48.0",
     "next": "16.3.6",
-    "node-fetch": "^2.6.7",
+    "node-fetch": "^3.3.2",
     "react": "^19.3.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.3.0",
@@ -73,11 +73,11 @@
     "tailwind-merge": "^3.7.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^14.0.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/lodash": "^4.17.25",
-    "@types/node": "^25.9.8",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/uuid": "^10.0.0",
@@ -93,6 +93,21 @@
   "overrides": {
     "firebase-frameworks": {
       "cookie": "^0.7.0"
+    },
+    "@genkit-ai/ai": {
+      "uuid": "^11.1.1"
+    },
+    "@genkit-ai/tools-common": {
+      "uuid": "^11.1.1"
+    },
+    "genkit": {
+      "uuid": "^11.1.1"
+    },
+    "google-gax": {
+      "uuid": "^11.1.1"
+    },
+    "googleapis-common": {
+      "uuid": "^11.1.1"
     }
   }
 }

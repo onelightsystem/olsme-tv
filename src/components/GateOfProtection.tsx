@@ -72,10 +72,23 @@ export default function GateOfProtection() {
   const widgetIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ---- Remove the tracked widget, if any (safe to call even when none exists) ----
+  const removeWidget = useCallback(() => {
+    const turnstile = getTurnstileApi();
+    if (widgetIdRef.current && turnstile) {
+      try {
+        turnstile.remove(widgetIdRef.current);
+      } catch {
+        // ignore — widget's DOM node may already be gone (e.g. Fast Refresh swapped the tree)
+      }
+    }
+    widgetIdRef.current = null;
+  }, []);
+
   // ---- Render the Turnstile widget into containerRef ----
   const renderWidget = useCallback(() => {
     if (!containerRef.current) return;
-    if (widgetIdRef.current) return; // already rendered
+    if (widgetIdRef.current) return; // already rendered — never create a second widget
     const turnstile = getTurnstileApi();
     if (!turnstile) return;
 
@@ -201,20 +214,13 @@ export default function GateOfProtection() {
     dialogRef.current?.focus();
   }, [visible]);
 
-  // ---- Clean up Turnstile widget on component unmount ----
+  // ---- Clean up Turnstile widget on component unmount / Fast Refresh ----
   useEffect(() => {
     return () => {
-      const turnstile = getTurnstileApi();
-      if (widgetIdRef.current && turnstile) {
-        try {
-          turnstile.remove(widgetIdRef.current);
-        } catch {
-          // ignore — widget may already be gone
-        }
-      }
+      removeWidget();
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, []);
+  }, [removeWidget]);
 
   // ---- Verify handler ----
   const handleVerify = async () => {
@@ -241,7 +247,7 @@ export default function GateOfProtection() {
         body: JSON.stringify({ turnstileToken: token, expectedAction: 'gate' }),
       });
 
-      const data = (await res.json()) as { success?: boolean; error?: string };
+      const data = (await res.json()) as { success?: boolean; error?: string; code?: string };
 
       if (res.ok && data.success) {
         try {
@@ -253,7 +259,11 @@ export default function GateOfProtection() {
       } else {
         setGateState('error');
         setErrorMsg(
-          'Verification did not pass. Please complete the challenge and try again.'
+          data.code === 'missing_token'
+            ? 'No verification token received yet. Please wait for the challenge to load and try again.'
+            : data.code === 'network_error' || data.code === 'server_misconfigured'
+              ? 'Verification service is temporarily unavailable. Please try again shortly.'
+              : 'Verification did not pass. Please complete the challenge and try again.'
         );
         const turnstile = getTurnstileApi();
         if (widgetIdRef.current && turnstile) {
@@ -331,6 +341,7 @@ export default function GateOfProtection() {
                 opacity: 0.18,
               }}
               animate={{ y: [0, -10, 0], opacity: [0.18, 0.4, 0.18] }}
+              exit={{ opacity: 0 }}
               transition={{
                 duration: p.dur,
                 repeat: Infinity,
@@ -361,6 +372,7 @@ export default function GateOfProtection() {
                   <motion.div
                     className="absolute inset-0 rounded-full border border-[#FFD700]/20"
                     animate={{ scale: [1, 1.55, 1], opacity: [0.4, 0, 0.4] }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
                     aria-hidden="true"
                   />

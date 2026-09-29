@@ -7,6 +7,18 @@ export type LogEntry = {
 
 export const developerLogEntries: LogEntry[] = [
   {
+    date: new Date('2026-09-29'),
+    title: 'Turnstile gate 400 fixed — canonical URL moved to Firebase Hosting',
+    description:
+      'Fixed a local dev bug where the entry gate always rejected verification with a 400: ' +
+      'Cloudflare\'s official dummy test key pair returns success without an "action" field, ' +
+      'but our check required an exact action match. The route now recognizes the test-key ' +
+      'response and only enforces the action match for real production tokens.\n\n' +
+      'The custom domain olsme.tv is not being renewed. The canonical public URL is now the ' +
+      'Firebase Hosting URL, https://studio-4615914296-4bd91.web.app. ' +
+      'olsme.tv / OneLightSystem OLS is open for investors and collaborators — see /about for details.',
+  },
+  {
     date: new Date('2026-03-28'),
     title: 'v0.4.2 - Full SSR Restored – Cloud Run 409 Bug Resolved',
     description:

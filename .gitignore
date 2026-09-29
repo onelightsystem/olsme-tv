@@ -44,8 +44,17 @@ next-env.d.ts
 
 .genkit/*
 .env*
+!.env.example
 
 # firebase
 .firebase/
 firebase-debug.log
 firestore-debug.log
+
+# secrets / credentials — never commit
+service-account*.json
+credentials.json
+google-services.json
+GoogleService-Info.plist
+*.p12
+*.key

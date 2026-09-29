@@ -277,7 +277,7 @@ export default function ProfilePage() {
   const handleCopyReferralLink = async () => {
     if (!user) return;
 
-    const referralLink = `https://olsme.tv/?ref=${user.uid}`;
+    const referralLink = `https://studio-4615914296-4bd91.web.app/?ref=${user.uid}`;
 
     try {
       await navigator.clipboard.writeText(referralLink);

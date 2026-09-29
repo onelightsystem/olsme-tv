@@ -1,8 +1,8 @@
 # olsme.tv Blueprint
 
 Version: v0.4.2 (March 2026)
-Hosting: https://olsme.tv (Firebase Hosting + Cloud Run SSR)
-Fallback Firebase URL: https://studio-4615914296-4bd91.web.app
+Hosting: https://studio-4615914296-4bd91.web.app (Firebase Hosting + Cloud Run SSR)
+Note: the custom domain olsme.tv is not being renewed; the Firebase Hosting URL above is now canonical.
 
 > **Hosting mode (March 28, 2026):** Full SSR via Cloud Run (`frameworksBackend: us-central1`).
 > The 409 revision-conflict bug (firebase-tools #10148 / #10155) is resolved in firebase-tools v15.12.0.
