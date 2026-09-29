@@ -1,33 +1,69 @@
+# Project Tree
+
+Generated from `git ls-files | tree --fromfile` (tracked files only). Regenerate after significant structural changes.
+
+```
 .
+├── .claude
+│   └── CLAUDE.md
+├── .env.example
+├── .firebaserc
+├── .github
+│   ├── instructions
+│   │   └── instructions.md
+│   └── skills
+│       ├── debug
+│       │   └── SKILL.md
+│       ├── dependencies-security
+│       │   └── SKILL.md
+│       ├── docs-maintenance
+│       │   └── SKILL.md
+│       ├── firebase-functions
+│       │   └── SKILL.md
+│       ├── firestore-modular
+│       │   └── SKILL.md
+│       ├── lt-lh
+│       │   └── SKILL.md
+│       ├── nextjs-app-router
+│       │   └── SKILL.md
+│       └── public-repo-transition
+│           └── SKILL.md
+├── .gitignore
+├── .idx
+│   ├── dev.nix
+│   └── icon.png
+├── .modified
+├── .npmrc
+├── .vscode
+│   └── settings.json
 ├── apphosting.yaml
+├── CLAUDE.local.md
 ├── components.json
 ├── docs
 │   ├── blueprint.md
-│   ├── PAYPAL_LIVE_INTEGRATION.md
+│   ├── DEPLOY.md
+│   ├── LT-LH-PACKAGE-SUGGESTION.md
 │   ├── project-tree.md
-│   ├── SECURITY_HARDENING.md
+│   ├── PUBLIC_REPO.md
+│   ├── RESTORE_SSR.md
 │   └── security.md
 ├── eslint.config.js
 ├── firebase.json
 ├── firestore.rules
 ├── functions
 │   ├── eslint.config.js
-│   ├── functions.yaml
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── src
 │   │   └── index.ts
 │   ├── tsconfig.dev.json
 │   └── tsconfig.json
-├── next-env.d.ts
-├── next.config.ts
+├── next.config.mjs
 ├── package-lock.json
 ├── package.json
-├── PAYPAL_CODE_REFERENCE.md
-├── PAYPAL_DEPLOYMENT_SUMMARY.md
-├── PAYPAL_INTEGRATION_COMPLETE.md
-├── PAYPAL_QUICK_REFERENCE.md
 ├── postcss.config.mjs
+├── public
+│   └── robots.txt
 ├── README.md
 ├── src
 │   ├── ai
@@ -40,9 +76,18 @@
 │   │   ├── about
 │   │   │   └── page.tsx
 │   │   ├── admin
-│   │   │   └── users
-│   │   │       ├── logs
-│   │   │       │   └── page.tsx
+│   │   │   ├── error.tsx
+│   │   │   ├── loading.tsx
+│   │   │   ├── notifications
+│   │   │   │   └── page.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── referrals
+│   │   │   │   └── page.tsx
+│   │   │   ├── users
+│   │   │   │   ├── logs
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   └── verifications
 │   │   │       └── page.tsx
 │   │   ├── api
 │   │   │   ├── ipfs
@@ -62,9 +107,14 @@
 │   │   │   └── page.tsx
 │   │   ├── search
 │   │   │   └── page.tsx
+│   │   ├── signin
+│   │   │   └── page.tsx
 │   │   └── subscribe
 │   │       └── page.tsx
 │   ├── components
+│   │   ├── admin
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── TopBar.tsx
 │   │   ├── auth
 │   │   │   ├── auth-modal.tsx
 │   │   │   ├── auth-signup-form.tsx
@@ -76,6 +126,7 @@
 │   │   │   ├── video-player.tsx
 │   │   │   └── waiting-screen.tsx
 │   │   ├── DeveloperLogTimeline.tsx
+│   │   ├── GateOfProtection.tsx
 │   │   ├── Header.tsx
 │   │   ├── landing
 │   │   │   ├── landing-signup-form.tsx
@@ -119,11 +170,21 @@
 │   │       ├── toast.tsx
 │   │       ├── toaster.tsx
 │   │       └── tooltip.tsx
-│   └── hooks
-│       ├── use-mobile.tsx
-│       └── use-toast.ts
+│   ├── hooks
+│   │   ├── use-mobile.tsx
+│   │   └── use-toast.ts
+│   └── lib
+│       ├── developer-log.ts
+│       ├── firebase
+│       │   ├── config.ts
+│       │   └── firebase.ts
+│       ├── ipfs
+│       │   └── kubo-client.ts
+│       ├── ipfs-client.ts
+│       ├── placeholder-images.json
+│       ├── placeholder-images.ts
+│       ├── subscription.ts
+│       └── utils.ts
 ├── tailwind.config.ts
-├── tsconfig.json
-└── tsconfig.tsbuildinfo
-
-27 directories, 100 files
+└── tsconfig.json
+```
