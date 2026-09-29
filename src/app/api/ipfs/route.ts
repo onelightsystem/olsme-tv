@@ -1,4 +1,5 @@
 import {NextRequest, NextResponse} from 'next/server';
+import {createIpfsClient} from '@lib/ipfs/kubo-client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,8 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({error: 'IPFS auth not configured'}, {status: 503});
     }
 
-    const {create} = await import('kubo-rpc-client');
-    const ipfs = create({
+    const ipfs = await createIpfsClient({
       url: ipfsUrl,
       headers: authorization ? {authorization} : undefined
     });

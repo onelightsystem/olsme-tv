@@ -1,5 +1,6 @@
 "use client"
 
+// Phase 3D (dependency upgrade) skipped react-day-picker 9→10: this component is unused elsewhere in the app.
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"

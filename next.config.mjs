@@ -4,6 +4,13 @@
 // - Removed invalid `srcDir` option (Next.js 15.5.3 compatibility).
 // - Kept Webpack mock for `electron` and image domains.
 // - Solo Tip: Run `npm run build` to verify no errors, test images from olsme.com.
+//
+// Known issue (Phase 3 refactor, Sep 2026): `firebase deploy` fails to bundle this file
+// into the SSR Cloud Function with `"external" must be an array of strings`. Root cause:
+// firebase-tools' esbuild-based bundler expects esbuild ^0.19.2, but the resolved esbuild
+// (0.28.1) comes transitively from genkit-cli -> @genkit-ai/tools-common -> tsx. Pinning
+// esbuild down would likely break tsx/genkit-cli, so no safe local fix exists yet; deploy
+// currently proceeds with a warning and does not block hosting/functions releases.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@olsystem/lt-lh'],
